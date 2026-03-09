@@ -32,7 +32,7 @@ GENERATOR DRIVER PROPERTIES (Litmus Edge 4.x):
   The Generator driver has no device-level properties beyond 'name' and
   'description' (both handled automatically by the Device model fields).
   Tags use register name 'S' (sinusoidal) or 'M' (monotonic). Required
-  tag properties: address (int), count (int), pollingInterval (float ms).
+  tag properties: address (int, must be >= 1), count (int), pollingInterval (float ms).
   Supported value types: float64, int64, uint64, bit, char, string.
   NOTE: do NOT include 'valueType' in the tag properties dict — it is
   already captured by the Tag model's value_type field and sent as the
@@ -137,7 +137,7 @@ class StoppedDeviceScenario(BaseScenario):
                 tag_name=tag_name,
                 description="Auto-generated lab tag.",
                 value_type="int64",
-                properties={"address": "0", "count": "1", "pollingInterval": "1000"},
+                properties={"address": "1", "count": "1", "pollingInterval": "1000"},
                 publish_cov=False,
             )
             for tag_name in ["temperature", "pressure", "flow_rate"]
@@ -146,7 +146,7 @@ class StoppedDeviceScenario(BaseScenario):
         logger.info("[DH-01] Created 3 tags on device.")
 
         # Step 5: STOP the device — this is the problem the learner must fix.
-        devices.stop_device(created_device, le_connection=conn)
+        devices.stop_devices([created_device], le_connection=conn)
         logger.info("[DH-01] Device stopped. Setup complete.")
 
     def validate(self, conn: LEConnection, state: ScenarioState) -> tuple[bool, str]:

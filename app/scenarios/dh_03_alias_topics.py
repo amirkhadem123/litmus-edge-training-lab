@@ -112,7 +112,7 @@ class AliasTopicsScenario(BaseScenario):
                 tag_name=tag_name,
                 description="Auto-generated lab tag.",
                 value_type="int64",
-                properties={"address": "0", "count": "1", "pollingInterval": "1000"},
+                properties={"address": "1", "count": "1", "pollingInterval": "1000"},
                 publish_cov=False,
             )
             for tag_name in ["speed", "torque"]

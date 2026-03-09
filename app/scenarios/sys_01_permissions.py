@@ -44,7 +44,7 @@ from litmussdk.system import users
 from litmussdk.utils.conn import LEConnection
 
 from scenarios.base import BaseScenario, ScenarioState
-from litmus_utils import safe_delete_user, safe_delete_user_group, safe_delete_user_role
+from litmus_utils import safe_delete_sys_resources_by_name, safe_delete_user, safe_delete_user_group, safe_delete_user_role
 
 
 logger = logging.getLogger(__name__)
@@ -95,8 +95,12 @@ class PermissionsScenario(BaseScenario):
         """
         Create a role with Viewer-only permissions, a group with that role,
         and a user in that group.
+
+        Pre-cleanup is run first to delete any role/group/user left over from
+        a previous partial run (e.g. after a container restart mid-scenario).
         """
         logger.info("[SYS-01] Running setup: creating restricted user '%s'", LAB_USERNAME)
+        safe_delete_sys_resources_by_name(conn, LAB_USERNAME, LAB_GROUP_NAME, LAB_ROLE_NAME)
 
         # Step 1: Create a role with only read ('View') access.
         # The 'dh' permission covers DeviceHub. 'access' covers the general UI.
