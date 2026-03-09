@@ -38,7 +38,7 @@ from litmussdk.devicehub.tags._models import Tag
 from litmussdk.utils.conn import LEConnection
 
 from scenarios.base import BaseScenario, ScenarioState
-from litmus_utils import safe_delete_devices_by_ids
+from litmus_utils import get_driver_id_by_name, safe_delete_device_by_name, safe_delete_devices_by_ids
 
 
 logger = logging.getLogger(__name__)
@@ -88,13 +88,15 @@ class AliasTopicsScenario(BaseScenario):
         The device runs normally on raw topics, but alias subscriptions fail silently.
         """
         logger.info("[DH-03] Running setup: creating device '%s' with alias_topics=False", LAB_DEVICE_NAME)
+        safe_delete_device_by_name(conn, LAB_DEVICE_NAME)
 
         # Note: alias_topics=False — this is the problem
+        generator_id = get_driver_id_by_name(conn, "Generator")
         device = Device(
             name=LAB_DEVICE_NAME,
-            driver="generator",
+            driver=generator_id,
             description="Lab training device — do not use in production.",
-            properties={"updateRate": "1000"},
+            properties={},
             alias_topics=False,  # THE BUG: alias topics are disabled
             debug=False,
         )
@@ -106,11 +108,11 @@ class AliasTopicsScenario(BaseScenario):
         tag_objects = [
             Tag(
                 device=created_device,
-                name="int",
+                name="S",
                 tag_name=tag_name,
                 description="Auto-generated lab tag.",
-                value_type="int",
-                properties={"readWrite": "Read Only"},
+                value_type="int64",
+                properties={"address": "0", "count": "1", "pollingInterval": "1000"},
                 publish_cov=False,
             )
             for tag_name in ["speed", "torque"]

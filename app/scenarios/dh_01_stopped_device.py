@@ -28,11 +28,16 @@ TEARDOWN:
   when a device is deleted) is removed. If the learner already deleted
   the device themselves, the safe_delete helper absorbs the error.
 
-GENERATOR DRIVER PROPERTIES:
-  The Generator driver requires a 'updateRate' property (in milliseconds)
-  that controls how often it produces new values. We use 1000ms (1 second).
-  Generator tags use a 'name' of 'int' (integer register) and require a
-  'valueType' of 'int'.
+GENERATOR DRIVER PROPERTIES (Litmus Edge 4.x):
+  The Generator driver has no device-level properties beyond 'name' and
+  'description' (both handled automatically by the Device model fields).
+  Tags use register name 'S' (sinusoidal) or 'M' (monotonic). Required
+  tag properties: address (int), count (int), pollingInterval (float ms).
+  Supported value types: float64, int64, uint64, bit, char, string.
+  NOTE: do NOT include 'valueType' in the tag properties dict — it is
+  already captured by the Tag model's value_type field and sent as the
+  top-level ValueType in the GQL payload. Duplicating it causes a server
+  validation error.
 """
 
 import logging
@@ -43,7 +48,7 @@ from litmussdk.devicehub.tags._models import Tag
 from litmussdk.utils.conn import LEConnection
 
 from scenarios.base import BaseScenario, ScenarioState
-from litmus_utils import get_device_running_state, safe_delete_devices_by_ids
+from litmus_utils import get_device_running_state, get_driver_id_by_name, safe_delete_device_by_name, safe_delete_devices_by_ids
 
 
 logger = logging.getLogger(__name__)
@@ -89,46 +94,50 @@ class StoppedDeviceScenario(BaseScenario):
 
     def setup(self, conn: LEConnection, state: ScenarioState) -> None:
         """
-        Create a Generator device with three integer tags, then stop it.
+        Create a Generator device with three tags, then stop it.
 
         Steps:
-          1. Build a Device object using the 'generator' driver name.
-             The SDK automatically resolves the string 'generator' to the
-             full Driver object with its property definitions.
-          2. Set the 'updateRate' property to 1000 (milliseconds).
+          1. Delete any pre-existing device with this name (idempotent cleanup
+             for the case where a previous partial run left an orphan).
+          2. Look up the Generator driver UUID from the cached driver record.
+             The SDK requires a UUID — display names are not accepted.
           3. Create the device via the API — it starts running by default.
-          4. Create three integer tags so the device looks realistic.
+          4. Create three 'S' register tags so the device looks realistic.
           5. Stop the device — this is the "break".
         """
         logger.info("[DH-01] Running setup: creating and stopping device '%s'", LAB_DEVICE_NAME)
+        safe_delete_device_by_name(conn, LAB_DEVICE_NAME)
 
-        # Step 1–2: Build the Device object.
-        # 'driver' can be passed as a plain string — the SDK's DriverField
-        # validator resolves it to the correct Driver object automatically.
+        # Step 2: Look up the Generator driver UUID.
+        # The SDK's Device model requires a driver UUID, not a display name.
+        # get_driver_id_by_name() searches the downloaded driver record by name.
+        generator_id = get_driver_id_by_name(conn, "Generator")
         device = Device(
             name=LAB_DEVICE_NAME,
-            driver="generator",
+            driver=generator_id,
             description="Lab training device — do not use in production.",
-            properties={"updateRate": "1000"},
+            properties={},
             alias_topics=True,
             debug=False,
         )
 
-        # Step 3: Create the device. It starts in a running state by default.
+        # Step 3: Create the device — starts running by default.
         created_device = devices.create_device(device, le_connection=conn)
         state.resources.append(("device", created_device.id))
         logger.info("[DH-01] Device created with id: %s", created_device.id)
 
-        # Step 4: Create three integer tags under the new device.
-        # Generator 'int' registers produce random integer values.
+        # Step 4: Create three tags under the new device.
+        # Register 'S' produces sinusoidal values. Required properties are
+        # address, count, and pollingInterval. Do NOT include valueType here —
+        # it is already sent as the top-level ValueType GQL field via value_type.
         tag_objects = [
             Tag(
                 device=created_device,
-                name="int",
+                name="S",
                 tag_name=tag_name,
                 description="Auto-generated lab tag.",
-                value_type="int",
-                properties={"readWrite": "Read Only"},
+                value_type="int64",
+                properties={"address": "0", "count": "1", "pollingInterval": "1000"},
                 publish_cov=False,
             )
             for tag_name in ["temperature", "pressure", "flow_rate"]

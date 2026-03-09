@@ -3,12 +3,16 @@ engine.py — The ScenarioEngine: manages scenario lifecycle and state.
 
 This is the "brain" of the application. It is responsible for:
 
-  1. LOADING scenarios  — discovering all scenario classes at startup.
-  2. RUNNING setup()    — injecting the Litmus API connection and starting
+  1. CONNECTING        — creating the Litmus Edge API connection at startup.
+  2. DRIVER CACHE      — downloading the DeviceHub driver record from the
+                          connected Litmus Edge instance (required before any
+                          device can be created via the SDK).
+  3. LOADING scenarios — discovering all scenario classes at startup.
+  4. RUNNING setup()   — injecting the Litmus API connection and starting
                           the timeout countdown.
-  3. RUNNING validate() — forwarding the check to the active scenario.
-  4. RUNNING teardown() — cleaning up resources and resetting state.
-  5. TIMEOUT handling   — automatically calling teardown() if the learner
+  5. RUNNING validate() — forwarding the check to the active scenario.
+  6. RUNNING teardown() — cleaning up resources and resetting state.
+  7. TIMEOUT handling  — automatically calling teardown() if the learner
                           hasn't solved or reset the scenario within the
                           configured time limit.
 
@@ -35,6 +39,8 @@ import pkgutil
 from datetime import datetime
 from typing import Optional
 
+from litmussdk.devicehub.record._cli import create_dh_cache
+from litmussdk.devicehub.record._functions import get_version
 from litmussdk.utils.conn import LEConnection, new_le_connection
 
 import scenarios as scenarios_pkg
@@ -148,6 +154,17 @@ class ScenarioEngine:
             validate_certificate=validate_cert,
         )
         logger.info("Litmus Edge connection established to: %s", edge_url)
+
+        # Download the DeviceHub driver record cache for the connected Litmus Edge
+        # version. This is required before any device can be created via the SDK.
+        # create_dh_cache() is a no-op if the version is already cached.
+        try:
+            dh_version = get_version(self.conn)
+            logger.info("Downloading DeviceHub driver record for version %s …", dh_version)
+            create_dh_cache(dh_version, self.conn)
+            logger.info("DeviceHub driver record ready (version %s).", dh_version)
+        except Exception as exc:
+            logger.warning("Could not download DeviceHub driver record: %s", exc)
 
         self.scenario_classes = _load_all_scenario_classes()
         logger.info(

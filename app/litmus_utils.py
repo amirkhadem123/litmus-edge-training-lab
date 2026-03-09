@@ -28,10 +28,41 @@ import re
 import requests
 import logging
 
+from litmussdk.devicehub.record import load_dh_record
 from litmussdk.utils.conn import LEConnection
 
 
 logger = logging.getLogger(__name__)
+
+
+def get_driver_id_by_name(conn: LEConnection, driver_name: str) -> str:
+    """
+    Look up a DeviceHub driver's UUID by its display name.
+
+    The SDK's Device model expects a driver UUID (e.g. '5BC98836-...' for the
+    Generator driver), not a human-readable name string. This helper loads the
+    cached driver record and searches by name, returning the UUID to pass as the
+    'driver' argument when constructing a Device object.
+
+    Args:
+        conn:        An authenticated LEConnection (used to load the cached record).
+        driver_name: The driver's display name exactly as shown in Litmus Edge,
+                     e.g. "Generator".
+
+    Returns:
+        The driver's UUID string (uppercase).
+
+    Raises:
+        ValueError: if no driver with that name exists in the cached record.
+    """
+    record = load_dh_record(conn)
+    for driver in record._drivers.values():
+        if driver.name.lower() == driver_name.lower():
+            return driver.id
+    raise ValueError(
+        f"No driver named '{driver_name}' found in the DeviceHub record. "
+        f"Available names: {[d.name for d in record._drivers.values()]}"
+    )
 
 
 def get_device_running_state(conn: LEConnection, device_name: str) -> bool | None:
@@ -166,6 +197,30 @@ def get_service_active_state(conn: LEConnection, service_name: str) -> str | Non
             "Unexpected response format for service '%s': %s", service_name, exc
         )
         return None
+
+
+def safe_delete_device_by_name(conn: LEConnection, device_name: str) -> None:
+    """
+    Delete a device by display name if it exists, silently ignoring errors.
+
+    Used at the start of setup() to clean up any device left over from a
+    previous partial run (e.g. after a container restart mid-scenario).
+
+    Args:
+        conn:        An authenticated LEConnection.
+        device_name: The device's display name (e.g. "lab-machine-01").
+    """
+    from litmussdk.devicehub import devices  # local import avoids circular refs
+
+    try:
+        all_devices = devices.list_devices(le_connection=conn)
+        matching = [d for d in all_devices if d.name == device_name]
+        if matching:
+            ids = [d.id for d in matching if d.id]
+            devices.delete_devices_by_ids(ids, le_connection=conn)
+            logger.info("Pre-setup cleanup: deleted existing device '%s' (ids: %s)", device_name, ids)
+    except Exception as exc:
+        logger.warning("Pre-setup cleanup failed for device '%s': %s", device_name, exc)
 
 
 def safe_delete_devices_by_ids(conn: LEConnection, device_ids: list[str]) -> None:

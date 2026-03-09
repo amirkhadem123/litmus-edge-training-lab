@@ -3,9 +3,9 @@
   base.html — Shared layout used by all pages.
 
   Every other template "extends" this one using Jinja2's inheritance system:
-      {% extends "base.html" %}
+      [extends "base.html"]
 
-  Pages override the {% block content %} section with their own HTML.
+  Pages override the [block content] section with their own HTML.
   This means header, footer, and styles are defined once here.
 
   STYLES:

@@ -34,7 +34,7 @@ from litmussdk.devicehub.devices._models import Device
 from litmussdk.utils.conn import LEConnection
 
 from scenarios.base import BaseScenario, ScenarioState
-from litmus_utils import safe_delete_devices_by_ids
+from litmus_utils import get_driver_id_by_name, safe_delete_device_by_name, safe_delete_devices_by_ids
 
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class NoTagsScenario(BaseScenario):
         "Click on 'lab-quality-sensor-02' in DeviceHub to open its detail view. "
         "Look at the Tags section — how many tags are configured?",
         "The device has no tags. Use the 'Add Tag' option inside the device to create "
-        "at least one tag. For a Generator device, you can add an 'int' type register.",
+        "at least one tag. For a Generator device, choose the 'S' register type.",
     ]
 
     timeout_minutes = 30
@@ -83,12 +83,14 @@ class NoTagsScenario(BaseScenario):
         device is broken, but that no data points have been configured on it.
         """
         logger.info("[DH-02] Running setup: creating tagless device '%s'", LAB_DEVICE_NAME)
+        safe_delete_device_by_name(conn, LAB_DEVICE_NAME)
 
+        generator_id = get_driver_id_by_name(conn, "Generator")
         device = Device(
             name=LAB_DEVICE_NAME,
-            driver="generator",
+            driver=generator_id,
             description="Lab training device — do not use in production.",
-            properties={"updateRate": "1000"},
+            properties={},
             alias_topics=True,
             debug=False,
         )

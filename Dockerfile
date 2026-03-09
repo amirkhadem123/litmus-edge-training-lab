@@ -41,8 +41,8 @@ WORKDIR /app
 #
 # --no-cache-dir tells pip not to cache downloaded packages, keeping the
 # image size smaller.
-COPY resources/litmussdk-2.0.1-py3-none-any.whl /tmp/litmussdk.whl
-RUN pip install --no-cache-dir /tmp/litmussdk.whl && rm /tmp/litmussdk.whl
+COPY resources/litmussdk-2.0.1-py3-none-any.whl /tmp/litmussdk-2.0.1-py3-none-any.whl
+RUN pip install --no-cache-dir /tmp/litmussdk-2.0.1-py3-none-any.whl && rm /tmp/litmussdk-2.0.1-py3-none-any.whl
 
 # ── Install Python dependencies ──────────────────────────────────────────────
 # We copy requirements.txt first (separate from app code) so that Docker can
