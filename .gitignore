@@ -1,0 +1,58 @@
+# .gitignore — tells git which files to never track or commit.
+#
+# HOW .gitignore WORKS:
+#   Any file or folder pattern listed here is completely ignored by git.
+#   This means `git status` won't show them, and `git add .` won't include them.
+#   This is important for two reasons:
+#     1. Secrets (.env) must never be committed to a repository.
+#     2. Generated/binary files (Python caches, build artifacts) clutter history.
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+# The actual .env file contains real API credentials. NEVER commit this.
+# Only the template (.env.example) is committed.
+.env
+
+# ── Resources folder ───────────────────────────────────────────────────────
+# The resources/ folder contains the Litmus SDK wheel file and reference
+# documents used during development. These are binary/large files that do
+# not belong in git:
+#   - The wheel file is installed at Docker build time from the local copy.
+#   - The markdown review documents are internal reference material.
+resources/
+
+# ── Python cache files ─────────────────────────────────────────────────────
+# Python creates these automatically when it runs .py files.
+# They are machine-specific and regenerated on every run — no need to track them.
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# ── Python virtual environments ────────────────────────────────────────────
+# If you create a local virtual environment (e.g. `python -m venv venv`),
+# its folder should not be committed — it is large and machine-specific.
+venv/
+.venv/
+env/
+.env.local
+
+# ── Distribution / packaging artifacts ────────────────────────────────────
+dist/
+build/
+*.egg-info/
+
+# ── OS-generated files ─────────────────────────────────────────────────────
+.DS_Store          # macOS Finder metadata
+Thumbs.db          # Windows Explorer thumbnail cache
+desktop.ini        # Windows folder customisation
+
+# ── IDE / editor config ────────────────────────────────────────────────────
+# These are personal editor settings that differ per developer.
+.idea/
+*.sublime-project
+*.sublime-workspace
+# Note: .vscode/ is intentionally NOT ignored — shared editor settings
+# (like recommended extensions) can be useful to commit.
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+*.log

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!--
+  base.html — Shared layout used by all pages.
+
+  Every other template "extends" this one using Jinja2's inheritance system:
+      {% extends "base.html" %}
+
+  Pages override the {% block content %} section with their own HTML.
+  This means header, footer, and styles are defined once here.
+
+  STYLES:
+  We use inline CSS (no external framework) to keep this self-contained —
+  the app runs inside a Docker container on an air-gapped industrial device
+  that may not have internet access. No CDN links.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Litmus Lab{% endblock %}</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ───────────────────────────────────────────────────────── */
+    .header {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3748;
+      padding: 0.85rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .header-logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.5px;
+    }
+    .header-logo span { color: #38bdf8; }
+    .header-sub {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-left: auto;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1.1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: #2563eb; color: #fff; }
+    .btn-success  { background: #16a34a; color: #fff; }
+    .btn-danger   { background: #dc2626; color: #fff; }
+    .btn-warning  { background: #d97706; color: #fff; }
+    .btn-ghost    { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+    /* ── Badges ───────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .badge-devicehub { background: #0c4a6e; color: #7dd3fc; }
+    .badge-system    { background: #3b0764; color: #d8b4fe; }
+    .badge-beginner      { background: #14532d; color: #86efac; }
+    .badge-intermediate  { background: #78350f; color: #fcd34d; }
+    .badge-active    { background: #1d4ed8; color: #bfdbfe; }
+    .badge-completed { background: #065f46; color: #6ee7b7; }
+
+    /* ── Alert / notice boxes ─────────────────────────────────────────── */
+    .alert {
+      padding: 0.85rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid;
+    }
+    .alert-warning  { background: #1c1207; border-color: #d97706; color: #fde68a; }
+    .alert-info     { background: #0c1a2e; border-color: #3b82f6; color: #93c5fd; }
+    .alert-success  { background: #052e16; border-color: #16a34a; color: #86efac; }
+    .alert-error    { background: #1a0a0a; border-color: #dc2626; color: #fca5a5; }
+
+    /* ── Result message (shown after check / reset) ───────────────────── */
+    #result-message {
+      display: none;
+      margin-top: 1rem;
+    }
+
+    /* ── Misc utilities ───────────────────────────────────────────────── */
+    .mt-1 { margin-top: 0.5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .mt-3 { margin-top: 1.5rem; }
+    .text-muted { color: #64748b; font-size: 0.875rem; }
+    .text-sm    { font-size: 0.875rem; }
+    hr { border: none; border-top: 1px solid #1e293b; margin: 1.5rem 0; }
+
+    /* ── Spinner (shown while a button is processing) ─────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo"><span>Litmus</span> Lab</div>
+    <a href="/" class="text-sm" style="color:#64748b;">← All Scenarios</a>
+    {% if edge_url %}
+    <div class="header-sub">
+      Target: <a href="{{ edge_url }}" target="_blank">{{ edge_url }}</a>
+    </div>
+    {% endif %}
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!--
+    shared-js: JavaScript helper functions used by both index.html and
+    scenario.html. Defined here so they are available on every page.
+  -->
+  <script>
+    /**
+     * postJSON(url) — sends a POST request with no body and returns the
+     * parsed JSON response. Used by all button click handlers.
+     *
+     * We use the modern fetch() API which is available in all current browsers.
+     */
+    async function postJSON(url) {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      return resp.json();
+    }
+
+    /**
+     * showResult(data) — displays the result message returned by the API.
+     * data.success controls whether we show a success (green) or error (red) box.
+     */
+    function showResult(data) {
+      const el = document.getElementById("result-message");
+      if (!el) return;
+      el.className = "alert " + (data.success ? "alert-success" : "alert-error");
+      el.textContent = data.message || (data.success ? "Done." : "Something went wrong.");
+      el.style.display = "block";
+    }
+
+    /**
+     * withSpinner(btn, asyncFn) — disables a button, shows a spinner inside it,
+     * runs asyncFn(), then restores the button. This prevents double-clicks and
+     * gives the user visual feedback while the API call is in progress.
+     */
+    async function withSpinner(btn, asyncFn) {
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Working…';
+      try {
+        await asyncFn();
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    }
+  </script>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

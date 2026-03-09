@@ -1,0 +1,33 @@
+# requirements.txt — Python dependencies for Litmus Lab
+#
+# HOW TO READ THIS FILE:
+# Each line is a package name with a minimum version (>=) or exact version (==).
+# "==" pins to an exact version so the build is reproducible.
+# ">=" allows newer compatible versions.
+#
+# The litmussdk package is NOT listed here because it is installed from the
+# local wheel file during the Docker build (see Dockerfile). Listing it here
+# would cause pip to try to fetch it from PyPI, where it is not available.
+
+# Web framework — handles HTTP routing, request parsing, response rendering
+fastapi==0.115.5
+
+# ASGI server — runs the FastAPI app and handles incoming HTTP connections
+uvicorn[standard]==0.32.1
+
+# Jinja2 — HTML templating engine used by FastAPI for server-rendered pages
+jinja2==3.1.4
+
+# python-dotenv — reads .env files and sets environment variables
+python-dotenv==1.0.1
+
+# requests — HTTP client library used in litmus_utils.py for raw API calls
+# (the litmussdk also depends on this, but we declare it explicitly for clarity)
+requests>=2.31.0
+
+# pydantic — data validation library; required by both FastAPI and litmussdk
+pydantic>=2.6.0
+
+# pydantic-settings — reads configuration from environment variables into
+# typed Pydantic models; used internally by litmussdk's LEConnection class
+pydantic-settings>=2.2.0
