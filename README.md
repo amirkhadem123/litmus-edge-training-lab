@@ -27,7 +27,7 @@ Litmus Lab is a Python web application that runs as a Docker container **inside*
 | `dh-02` | The Tagless Device | DeviceHub | Beginner | A device is running but has zero tags configured |
 | `dh-03` | The Silent Alias | DeviceHub | Intermediate | A device runs without alias topics, so flow subscriptions by name receive nothing |
 | `sys-01` | The Locked-Out Engineer | System | Beginner | A user account has Viewer-only permissions and cannot modify DeviceHub |
-| `sys-02` | The Dead Service | System | Intermediate | The analytics service (`loopedge-analytics2`) is stopped |
+| `sys-02` | The Dead Service | System | Intermediate | The SSH service is stopped — engineers can no longer connect to the device |
 
 > ⚠️ **SYS-02 note:** This scenario stops a real platform service. If the app is restarted mid-scenario, use the **Force Reset All** button on the home page, or restart the service manually via *System > Device Management > Services* in Litmus Edge.
 

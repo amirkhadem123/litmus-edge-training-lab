@@ -3,39 +3,40 @@ Scenario SYS-02: The Dead Service
 Category: System | Difficulty: Intermediate
 
 WHAT THIS SCENARIO TEACHES:
-  Litmus Edge is built as ~25 independent services managed by systemd.
-  Most of these services are shown as coloured status indicators on the
-  Litmus Edge main dashboard (green = running, red = stopped/failed).
+  Litmus Edge hosts a number of services that can be enabled or disabled
+  by an administrator. When a service is stopped, its functionality becomes
+  unavailable without any error message to other users.
 
-  When a service stops, the features it provides become unavailable — but
-  the rest of the platform keeps running. Analytics stopping won't affect
-  device connectivity, for example.
-
-  Knowing WHERE to look for a stopped service (the dashboard status panel,
-  or System > Support > Component Status) and HOW to restart it
-  (System > Device Management > Services) is an essential support skill.
+  Knowing WHERE to look for a stopped service (System > Device Management >
+  Services) and HOW to restart it is an essential support skill.
 
 HOW THE BREAK WORKS:
-  setup() calls the Services API to stop 'loopedge-analytics2', which is
-  the analytics calculation engine. After stopping it:
-    - The Analytics module indicator on the Litmus Edge dashboard turns red.
-    - Any configured analytics calculations stop producing output.
-    - Everything else (DeviceHub, Flows, cloud connectors) continues normally.
+  setup() calls the Services API to stop the SSH service. After stopping it:
+    - Engineers can no longer open an SSH session to the device.
+    - All other platform functionality (DeviceHub, Flows, Analytics, cloud
+      connectors) continues normally.
 
-⚠️ IMPORTANT RISK NOTE:
-  This scenario stops a REAL platform service. If the app crashes or is
-  restarted while this scenario is active, teardown() will not run and
-  the service will remain stopped. The 'Force Reset All' button on the
-  home page will restart it. If that also fails, the service can be
-  restarted manually from the Litmus Edge UI under:
-    System > Device Management > Services > loopedge-analytics2 > Start
+  The learner must navigate to the Services panel and re-enable SSH.
+
+WHY SSH:
+  Litmus Edge 4.0.x exposes a REST API for starting and stopping services,
+  but only a limited set of services are controllable via this API.
+  On this version, only the SSH service supports start/stop operations.
+  The Services panel in the UI shows all services regardless of API access,
+  so the troubleshooting workflow (find the red service → click Start) is
+  identical regardless of which service is stopped.
+
+  SERVICE API notes for LE 4.0.x:
+    - Service name used by the API: "ssh" (not the systemd unit name)
+    - GET  /dm/services/ssh  → {"status": "started"} or {"status": "stopped"}
+    - PUT  /dm/services/ssh/stop  → 204
+    - PUT  /dm/services/ssh/start → 204
 
 HOW VALIDATION WORKS:
-  We call the Services API to get the current ActiveState of
-  'loopedge-analytics2'. If it is 'active', the learner has restarted it.
+  GET /dm/services/ssh and check the 'status' field equals 'started'.
 
 TEARDOWN (SAFETY NET):
-  If the service is not already running when teardown fires, we start it.
+  If SSH is still stopped when teardown fires, we start it.
   This ensures the platform is left in a clean state regardless of whether
   the learner solved the scenario.
 """
@@ -51,14 +52,17 @@ from litmus_utils import get_service_active_state
 
 logger = logging.getLogger(__name__)
 
-# The systemd service name for the Litmus Edge analytics engine.
-# This is the internal name used by all loopedge-* services.
-SERVICE_NAME = "loopedge-analytics2"
+# The API service identifier for SSH on Litmus Edge 4.0.x.
+# This is the short ID used by /dm/services — not the systemd unit name.
+SERVICE_NAME = "ssh"
+
+# The status string returned by GET /dm/services/ssh when the service is running.
+STATUS_RUNNING = "started"
 
 
 class ServiceStoppedScenario(BaseScenario):
     """
-    SYS-02: The analytics service is stopped via the Services API.
+    SYS-02: The SSH service is stopped via the Services API.
     The learner must find and restart it through the Litmus Edge UI.
 
     ⚠️ This scenario modifies a real platform service. See module docstring.
@@ -70,45 +74,43 @@ class ServiceStoppedScenario(BaseScenario):
     difficulty = "Intermediate"
 
     symptom = (
-        "Analytics calculations that were producing output this morning have completely "
-        "stopped. No new results are being written. Looking at the main Litmus Edge "
-        "dashboard, one of the module status indicators is showing red. "
-        "Device connectivity and data collection appear to be working fine."
+        "Your team reports they can no longer open SSH sessions to the Litmus Edge "
+        "device — connections are refused. The Litmus Edge web UI is still accessible "
+        "and all other platform features appear to be working normally. "
+        "No one has changed any network or firewall settings."
     )
 
     learning_objective = (
-        "Learn to use the Litmus Edge module status dashboard and the Services panel "
-        "to identify a stopped system service and restart it."
+        "Learn to use the Litmus Edge Services panel to identify a stopped service "
+        "and restart it without rebooting the device."
     )
 
     hints = [
-        "Look at the module status indicators on the Litmus Edge main dashboard "
-        "(the coloured circles at the bottom of the page). One of them is red.",
-        "The red indicator corresponds to the Analytics module. Go to "
-        "System > Device Management > Services to see the list of running services.",
-        "Find 'loopedge-analytics2' in the services list. Its status will show "
-        "as stopped or inactive. Use the Start button to restart it.",
+        "SSH being refused but the web UI working suggests the SSH service itself "
+        "has been stopped — not a network or firewall issue.",
+        "Go to System > Device Management > Services in the Litmus Edge UI. "
+        "Look for a service called 'SSH' and check its status.",
+        "Find the SSH entry in the Services list. Its status will show as stopped. "
+        "Use the Start (or Enable) button to restart it.",
     ]
 
-    # Shorter timeout for this scenario because it affects a real service.
-    # If the learner walks away, we want to restore the service sooner.
+    # Shorter timeout — SSH being disabled affects real operations.
     timeout_minutes = 20
 
     # ── Class-level warning shown prominently in the UI ──────────────────────
-    # The UI template checks for this attribute and renders it in a warning box.
     service_impact_warning = (
-        "⚠️ This scenario stops the real 'loopedge-analytics2' service on your "
-        "Litmus Edge instance. Analytics calculations will be unavailable until "
-        "you restart the service or the scenario resets automatically after "
+        "⚠️ This scenario stops the real SSH service on your Litmus Edge instance. "
+        "SSH access to the device will be unavailable until you restart the service "
+        "or the scenario resets automatically after "
         f"{timeout_minutes} minutes. If this app is restarted mid-scenario, use "
         "the 'Force Reset All' button on the home page to restore the service."
     )
 
     def setup(self, conn: LEConnection, state: ScenarioState) -> None:
         """
-        Stop the analytics service using the Services API.
+        Stop the SSH service using the Services API.
 
-        We record the service name in state.resources so teardown() knows
+        Records the service name in state.resources so teardown() knows
         which service to restart if needed.
         """
         logger.info("[SYS-02] Running setup: stopping service '%s'", SERVICE_NAME)
@@ -120,51 +122,46 @@ class ServiceStoppedScenario(BaseScenario):
 
     def validate(self, conn: LEConnection, state: ScenarioState) -> tuple[bool, str]:
         """
-        Check whether the analytics service is running again.
-        """
-        active_state = get_service_active_state(conn, SERVICE_NAME)
+        Check whether the SSH service is running again.
 
-        if active_state == "active":
+        GET /dm/services/ssh returns {"status": "started"} or {"status": "stopped"}.
+        """
+        status = get_service_active_state(conn, SERVICE_NAME)
+
+        if status == STATUS_RUNNING:
             return (
                 True,
-                f"Correct! '{SERVICE_NAME}' is now active. Analytics calculations "
-                "will resume shortly. "
-                "Key takeaway: Litmus Edge services can be stopped, restarted, or "
-                "fail independently. The dashboard status indicators and the Services "
-                "panel under System are your first stop when a platform feature goes dark.",
+                f"Correct! The SSH service is now running. "
+                "Key takeaway: Litmus Edge services can be stopped independently. "
+                "The Services panel under System > Device Management is your "
+                "first stop when a platform feature or access method stops working.",
             )
-        elif active_state in ("inactive", "failed"):
+        elif status == "stopped":
             return (
                 False,
-                f"The service '{SERVICE_NAME}' is still {active_state}. "
-                "Go to System > Device Management > Services, find "
-                f"'{SERVICE_NAME}', and use the Start option.",
-            )
-        elif active_state == "activating":
-            return (
-                False,
-                f"The service '{SERVICE_NAME}' is currently starting up. "
-                "Wait a few seconds and check again.",
+                "The SSH service is still stopped. Go to "
+                "System > Device Management > Services, find 'SSH', "
+                "and use the Start option.",
             )
         else:
             return (
                 False,
-                f"Could not determine the state of '{SERVICE_NAME}' "
-                f"(got: {active_state!r}). Try checking again in a moment.",
+                f"Could not determine the state of the SSH service "
+                f"(got: {status!r}). Try checking again in a moment.",
             )
 
     def teardown(self, conn: LEConnection, state: ScenarioState) -> None:
         """
-        Safety net: if the service is not running, start it.
+        Safety net: if SSH is not running, start it.
 
-        This ensures the platform is clean even if the learner didn't solve
-        the scenario, the timeout fired, or the app was restarted.
+        This ensures the platform is left in a clean state even if the
+        learner didn't solve the scenario or the timeout fired.
         """
         logger.info("[SYS-02] Teardown: checking if '%s' needs to be started.", SERVICE_NAME)
 
-        current_state = get_service_active_state(conn, SERVICE_NAME)
+        current_status = get_service_active_state(conn, SERVICE_NAME)
 
-        if current_state != "active":
+        if current_status != STATUS_RUNNING:
             try:
                 services.start_and_enable_service(SERVICE_NAME, le_connection=conn)
                 logger.info("[SYS-02] Service '%s' started by teardown.", SERVICE_NAME)
@@ -175,6 +172,6 @@ class ServiceStoppedScenario(BaseScenario):
                     exc,
                 )
         else:
-            logger.info("[SYS-02] Service '%s' already active. No action needed.", SERVICE_NAME)
+            logger.info("[SYS-02] Service '%s' already running. No action needed.", SERVICE_NAME)
 
         logger.info("[SYS-02] Teardown complete.")
