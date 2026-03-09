@@ -13,29 +13,34 @@ WHAT THIS SCENARIO TEACHES:
   operations in DeviceHub or elsewhere.
 
   This is a common support ticket: "A new engineer can log in but can't do
-  anything." The fix is to assign them to a group whose role includes the
-  correct service-level permissions.
+  anything." The fix is to move the user into a group with the correct
+  service-level permissions (e.g. the Administrators group).
 
 HOW THE BREAK WORKS:
-  setup() creates:
-    1. A role called 'lab-viewer-only' with only read-level ('View') permissions.
-    2. A group called 'lab-restricted-group' assigned that role.
-    3. A user called 'lab-user-bob' placed in that group.
+  setup() creates a user called 'lab-user-bob' and adds them to the built-in
+  'Viewers' group, which has View-only permissions across all services including
+  DeviceHub. No custom role or group is created.
 
-  The learner must update the user's group (or the role's permissions) so that
-  'lab-user-bob' has at least DeviceHub 'Modify' access.
+  The learner must move 'lab-user-bob' to a group that includes DeviceHub
+  'Modify' access (e.g. the Administrators group).
+
+WHY NOT A CUSTOM ROLE/GROUP:
+  Litmus Edge 4.0.x does not expose a stable REST endpoint for assigning a
+  custom role to a custom group. The /auth/v3/groups/{id}/roles PUT endpoint
+  returns 404 for any role assignment. The built-in system groups (Viewers,
+  Administrators) already have stable role assignments, so this scenario uses
+  the Viewers group directly.
 
 HOW VALIDATION WORKS:
-  We check the permissions on the role assigned to the user's group.
-  Specifically, we look for 'dh' permissions that include 'Modify'.
+  We scan all groups for ones that contain 'lab-user-bob', then inspect the
+  permissions of every role attached to those groups. If any role has 'Modify'
+  in its 'dh' (DeviceHub) permissions, the scenario is solved.
 
 TEARDOWN:
-  Delete the user, the group, and the role — in that order, because
-  Litmus Edge may reject deletion of a group that still has users.
+  Only the lab user needs to be deleted — no custom group or role was created.
 
 RESOURCE TRACKING:
-  state.resources stores tuples in the order they were created:
-    ("role", role_id), ("group", group_id), ("user", username)
+  state.resources: [("user", username)]
 """
 
 import logging
@@ -44,21 +49,23 @@ from litmussdk.system import users
 from litmussdk.utils.conn import LEConnection
 
 from scenarios.base import BaseScenario, ScenarioState
-from litmus_utils import safe_delete_sys_resources_by_name, safe_delete_user, safe_delete_user_group, safe_delete_user_role
+from litmus_utils import safe_delete_user
 
 
 logger = logging.getLogger(__name__)
 
-LAB_ROLE_NAME = "lab-viewer-only"
-LAB_GROUP_NAME = "lab-restricted-group"
+# The built-in Viewers system group — has View-only permissions on all services
+# including DeviceHub. Guaranteed to exist on every Litmus Edge instance.
+VIEWERS_GROUP_ID = "default_viewers_group"
+
 LAB_USERNAME = "lab-user-bob"
 LAB_USER_PASSWORD = "LabPassword123!"   # meets typical complexity requirements
 
 
 class PermissionsScenario(BaseScenario):
     """
-    SYS-01: A user is created with only Viewer permissions.
-    The learner must update their role or group to grant DeviceHub access.
+    SYS-01: A user is created and placed in the Viewers group (View-only).
+    The learner must move them to a group with DeviceHub Modify access.
     """
 
     id = "sys-01"
@@ -84,57 +91,34 @@ class PermissionsScenario(BaseScenario):
         "not about their account status.",
         "Go to System > Access Control in the Litmus Edge UI. Look at the user "
         "'lab-user-bob' and check which group they belong to.",
-        "Check the role assigned to the group 'lab-restricted-group'. The role "
-        "likely has only 'View' permissions. Update it to include 'Modify' for "
-        "DeviceHub (dh), or move the user to a group with the Administrator role.",
+        "The user is in the 'Viewers' group which has read-only permissions. "
+        "Move them to the 'Administrators' group, or to any group whose role "
+        "includes DeviceHub 'Modify' access.",
     ]
 
     timeout_minutes = 30
 
     def setup(self, conn: LEConnection, state: ScenarioState) -> None:
         """
-        Create a role with Viewer-only permissions, a group with that role,
-        and a user in that group.
+        Create 'lab-user-bob' and add them to the built-in Viewers group.
 
-        Pre-cleanup is run first to delete any role/group/user left over from
-        a previous partial run (e.g. after a container restart mid-scenario).
+        The Viewers group already exists on every Litmus Edge instance and has
+        View-only permissions across all services. No custom role or group is
+        needed — the user's restricted access comes from being in this group.
+
+        Pre-cleanup deletes any previously orphaned user with this username
+        before creating a fresh one.
         """
         logger.info("[SYS-01] Running setup: creating restricted user '%s'", LAB_USERNAME)
-        safe_delete_sys_resources_by_name(conn, LAB_USERNAME, LAB_GROUP_NAME, LAB_ROLE_NAME)
 
-        # Step 1: Create a role with only read ('View') access.
-        # The 'dh' permission covers DeviceHub. 'access' covers the general UI.
-        # We intentionally omit 'Modify' from 'dh' to create the problem.
-        role_result = users.add_user_role(
-            name=LAB_ROLE_NAME,
-            le_connection=conn,
-            access=["View"],
-            dh=["View"],          # DeviceHub: read-only — THE BUG
-            events=["View"],
-            sysinfo=["View"],
-        )
-        role_id = role_result.get("id") or role_result.get("ID", LAB_ROLE_NAME)
-        state.resources.append(("role", role_id))
-        logger.info("[SYS-01] Created role '%s' (id: %s)", LAB_ROLE_NAME, role_id)
+        # Clean up any leftover user from a previous partial run
+        safe_delete_user(conn, LAB_USERNAME)
 
-        # Step 2: Create a group and assign the restrictive role to it.
-        group_result = users.create_user_group(
-            name=LAB_GROUP_NAME,
-            le_connection=conn,
-        )
-        group_id = group_result.get("id") or group_result.get("ID", LAB_GROUP_NAME)
-        state.resources.append(("group", group_id))
-        logger.info("[SYS-01] Created group '%s' (id: %s)", LAB_GROUP_NAME, group_id)
-
-        # Attach the role to the group
-        users.update_user_group_name(
-            user_group=group_id,
-            name=LAB_GROUP_NAME,
-            le_connection=conn,
-        )
-
-        # Step 3: Create the user and add them to the restricted group.
+        # Create the lab user. All four positional arguments are required by
+        # this version of the SDK (first_name, last_name, username, password).
         users.create_user(
+            first_name="Bob",
+            last_name="Engineer",
             username=LAB_USERNAME,
             password=LAB_USER_PASSWORD,
             le_connection=conn,
@@ -142,30 +126,32 @@ class PermissionsScenario(BaseScenario):
         state.resources.append(("user", LAB_USERNAME))
         logger.info("[SYS-01] Created user '%s'", LAB_USERNAME)
 
+        # Add the user to the built-in Viewers group.
+        # SDK parameter is users_to_be_added (list of username strings).
         users.add_users_to_group(
-            user_group_id=group_id,
-            usernames=[LAB_USERNAME],
+            user_group_id=VIEWERS_GROUP_ID,
+            users_to_be_added=[LAB_USERNAME],
             le_connection=conn,
         )
-        logger.info("[SYS-01] Added user '%s' to group '%s'. Setup complete.", LAB_USERNAME, LAB_GROUP_NAME)
+        logger.info(
+            "[SYS-01] Added '%s' to Viewers group. Setup complete.", LAB_USERNAME
+        )
 
     def validate(self, conn: LEConnection, state: ScenarioState) -> tuple[bool, str]:
         """
-        Check whether the user's current permissions include DeviceHub Modify.
+        Check whether the user's current groups include DeviceHub Modify.
 
-        We look up the user's group, get the role(s) on that group, and check
-        for 'dh' permissions containing 'Modify'.
+        Scans all groups for ones containing 'lab-user-bob', then checks
+        the permissions of every role on those groups.
         """
         try:
-            # Get current user details to find their group
             all_groups = users.get_user_groups(le_connection=conn)
         except Exception as exc:
             return False, f"Could not query user groups: {exc}"
 
-        # Find any group that contains lab-user-bob and check its permissions
-        for group in all_groups if isinstance(all_groups, list) else all_groups.get("groups", []):
-            group_id = group.get("id") or group.get("ID", "")
-            group_name = group.get("name") or group.get("Name", "")
+        for group in all_groups:
+            group_id = group.get("groupId") or group.get("id") or ""
+            group_name = group.get("groupName") or group.get("name") or ""
 
             try:
                 details = users.get_user_group_details(group_id, le_connection=conn)
@@ -175,15 +161,30 @@ class PermissionsScenario(BaseScenario):
             # Check if this group contains our lab user
             member_names = [
                 u.get("username") or u.get("Username", "")
-                for u in (details.get("users") or details.get("Users") or [])
+                for u in (details.get("users") or [])
             ]
             if LAB_USERNAME not in member_names:
                 continue
 
-            # This group contains lab-user-bob — check the roles' permissions
-            role_list = details.get("roles") or details.get("Roles") or []
-            for role in role_list:
-                permissions = role.get("permissions") or role.get("Permissions") or {}
+            # This group contains lab-user-bob — check its roles for dh Modify
+            for role in (details.get("roles") or []):
+                role_id = role.get("roleId") or role.get("id") or ""
+                if not role_id:
+                    continue
+                try:
+                    base_url, headers = conn.get_url_headers()
+                    import requests
+                    r = requests.get(
+                        f"{base_url}/auth/v3/roles/{role_id}",
+                        headers=headers,
+                        verify=conn.VALIDATE_CERTIFICATE,
+                        timeout=conn.TIMEOUT_SECONDS,
+                    )
+                    r.raise_for_status()
+                    permissions = r.json().get("permissions") or {}
+                except Exception:
+                    continue
+
                 dh_perms = permissions.get("dh") or []
                 if "Modify" in dh_perms:
                     return (
@@ -198,26 +199,16 @@ class PermissionsScenario(BaseScenario):
         return (
             False,
             "'lab-user-bob' still does not have DeviceHub Modify permissions. "
-            "Go to System > Access Control and update the role or group to include "
-            "'Modify' access for DeviceHub.",
+            "Go to System > Access Control and move the user to the Administrators "
+            "group, or to any group whose role includes DeviceHub 'Modify' access.",
         )
 
     def teardown(self, conn: LEConnection, state: ScenarioState) -> None:
         """
-        Delete user, group, and role in the correct order.
-        Litmus Edge requires the user to be removed from the group before
-        the group can be deleted.
+        Delete the lab user. No custom group or role was created, so nothing
+        else needs to be cleaned up.
         """
-        # Collect IDs by type from the resources list
         user_names = [res_id for res_type, res_id in state.resources if res_type == "user"]
-        group_ids = [res_id for res_type, res_id in state.resources if res_type == "group"]
-        role_ids = [res_id for res_type, res_id in state.resources if res_type == "role"]
-
         for username in user_names:
             safe_delete_user(conn, username)
-        for group_id in group_ids:
-            safe_delete_user_group(conn, group_id)
-        for role_id in role_ids:
-            safe_delete_user_role(conn, role_id)
-
         logger.info("[SYS-01] Teardown complete.")
