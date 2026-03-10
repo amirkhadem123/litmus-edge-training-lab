@@ -150,19 +150,22 @@ def get_device_running_state(conn: LEConnection, device_name: str) -> bool | Non
 
 def get_service_active_state(conn: LEConnection, service_name: str) -> str | None:
     """
-    Return the systemd ActiveState string for a named Litmus Edge service.
+    Return the status string for a named Litmus Edge service.
 
-    Litmus Edge exposes a REST endpoint for querying the status of its internal
-    services (which are managed by systemd). This function fetches that status
-    and returns the 'ActiveState' field, which will be one of:
-      "active"        — the service is running normally
-      "inactive"      — the service is stopped
-      "failed"        — the service crashed or failed to start
-      "activating"    — the service is in the process of starting
+    Litmus Edge exposes a REST endpoint at GET /dm/services/{service_name}
+    for querying service status. The response format varies by service:
+      - Some services return {"ActiveState": "active"|"inactive"|"failed"}
+      - Others return {"status": "started"|"stopped"}
+    This function checks all known field names in order and returns the
+    first value found.
+
+    On Litmus Edge 4.0.x, only the following services support start/stop
+    via the API (listed under 'canStartStop' in GET /dm/services):
+      "ssh"   — returns {"status": "started"|"stopped"}
 
     Args:
         conn:         An authenticated LEConnection.
-        service_name: The systemd service name, e.g. "loopedge-analytics2".
+        service_name: The service identifier, e.g. "ssh".
 
     Returns:
         The ActiveState string if the call succeeds, or None on failure.
