@@ -134,6 +134,17 @@ class BaseScenario(ABC):
     learner walks away.
     """
 
+    # ── Ticket metadata (used by the ticket-based UX) ─────────────────────────
+
+    ticket_number: str = ""
+    """Support ticket number shown in the UI, e.g. 'TKT-0042'."""
+
+    priority: str = "Medium"
+    """Ticket priority: 'High', 'Medium', or 'Low'. Controls badge colour."""
+
+    customer: str = ""
+    """Customer or team name that submitted the ticket, e.g. 'Acme Manufacturing'."""
+
     # ── Abstract methods (must be implemented by each subclass) ───────────────
 
     @abstractmethod

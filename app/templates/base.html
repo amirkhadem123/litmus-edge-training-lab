@@ -98,6 +98,10 @@
     .badge-intermediate  { background: #78350f; color: #fcd34d; }
     .badge-active    { background: #1d4ed8; color: #bfdbfe; }
     .badge-completed { background: #065f46; color: #6ee7b7; }
+    /* Priority badges for ticket UX */
+    .badge-priority-high   { background: #7f1d1d; color: #fca5a5; }
+    .badge-priority-medium { background: #78350f; color: #fcd34d; }
+    .badge-priority-low    { background: #0c4a6e; color: #7dd3fc; }
 
     /* ── Alert / notice boxes ─────────────────────────────────────────── */
     .alert {
@@ -143,7 +147,7 @@
 
   <header class="header">
     <div class="header-logo"><span>Litmus</span> Lab</div>
-    <a href="/" class="text-sm" style="color:#64748b;">← All Scenarios</a>
+    <a href="/" class="text-sm" style="color:#64748b;">← Ticket Queue</a>
     {% if edge_url %}
     <div class="header-sub">
       Target: <a href="{{ edge_url }}" target="_blank">{{ edge_url }}</a>

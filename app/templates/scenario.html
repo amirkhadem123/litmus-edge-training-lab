@@ -1,77 +1,79 @@
 {% extends "base.html" %}
-{% block title %}{{ scenario.title }} — Litmus Lab{% endblock %}
+{% block title %}{{ scenario.ticket_number or scenario.id }} — Litmus Lab{% endblock %}
 
 {% block content %}
 
-<!-- ── Breadcrumb & header ────────────────────────────────────────────────── -->
+<!-- ── Ticket header ─────────────────────────────────────────────────────── -->
 <div style="margin-bottom:1.5rem;">
-  <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
-    <span style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:600;">
-      {{ scenario.id }}
+
+  <!-- Ticket number + priority + status row -->
+  <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+    {% if scenario.ticket_number %}
+    <span style="font-size:0.85rem; font-weight:700; color:#94a3b8; letter-spacing:0.03em;">
+      Ticket #{{ scenario.ticket_number }}
     </span>
-    <span class="badge badge-{{ scenario.category | lower }}">{{ scenario.category }}</span>
-    <span class="badge badge-{{ scenario.difficulty | lower }}">{{ scenario.difficulty }}</span>
+    <span style="color:#334155;">·</span>
+    {% endif %}
+
+    {% if scenario.priority %}
+    <span class="badge badge-priority-{{ scenario.priority | lower }}">{{ scenario.priority | upper }}</span>
+    {% endif %}
+
     {% if scenario.is_completed %}
-      <span class="badge badge-completed">✓ Completed</span>
+      <span class="badge badge-completed">✓ Resolved</span>
     {% elif scenario.is_active %}
-      <span class="badge badge-active">● Active — {{ scenario.timeout_minutes }}min timeout</span>
+      <span class="badge badge-active">● In Progress — {{ scenario.timeout_minutes }}min timeout</span>
+    {% else %}
+      <span style="font-size:0.8rem; font-weight:600; color:#64748b;">○ Open</span>
     {% endif %}
   </div>
 
-  <h1 style="font-size:1.5rem; font-weight:700; color:#f1f5f9;">
+  <!-- Subject line -->
+  <h1 style="font-size:1.4rem; font-weight:700; color:#f1f5f9; line-height:1.4; margin-bottom:0.4rem;">
     {{ scenario.title }}
   </h1>
-  <p style="color:#94a3b8; font-size:0.875rem; margin-top:0.25rem;">
-    🎯 {{ scenario.learning_objective }}
+
+  <!-- Submitted by -->
+  {% if scenario.customer %}
+  <p style="font-size:0.82rem; color:#64748b;">
+    Submitted by: <span style="color:#94a3b8;">{{ scenario.customer }}</span>
   </p>
+  {% endif %}
+
 </div>
 
-<!-- ── Service impact warning (only rendered for SYS-02) ─────────────────── -->
-{% if service_warning %}
-<div class="alert alert-warning">
-  {{ service_warning }}
-</div>
-{% endif %}
-
-<!-- ── Symptom box ───────────────────────────────────────────────────────── -->
+<!-- ── Ticket description ────────────────────────────────────────────────── -->
 <div style="
   background: #0f172a;
   border: 1px solid #334155;
-  border-left: 4px solid #38bdf8;
   border-radius: 8px;
   padding: 1.1rem 1.25rem;
   margin-bottom: 1.5rem;
 ">
-  <p style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
-             letter-spacing:0.05em; color:#38bdf8; margin-bottom:0.4rem;">
-    What you observe
-  </p>
-  <p style="color:#e2e8f0; line-height:1.65;">{{ scenario.symptom }}</p>
+  <p style="color:#e2e8f0; line-height:1.7; white-space: pre-line;">{{ scenario.symptom }}</p>
 </div>
 
-<!-- ── Action buttons ───────────────────────────────────────────────────── -->
+<!-- ── Action buttons ────────────────────────────────────────────────────── -->
 <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
   {% if not scenario.is_active %}
-    <!-- Not started yet — show Start button -->
     <button
       class="btn btn-primary"
       id="start-btn"
       onclick="startScenario(this)"
     >
-      ▶ Start Scenario
+      ▶ Accept Ticket
     </button>
     <p class="text-muted text-sm" style="align-self:center;">
       This will inject the problem into your Litmus Edge instance.
     </p>
 
   {% else %}
-    <!-- Active — show Check, Hint, Reset buttons -->
     <button
       class="btn btn-success"
       id="check-btn"
       onclick="checkScenario(this)"
     >
-      ✓ Check My Solution
+      ✓ Mark Resolved
     </button>
 
     <button
@@ -80,7 +82,7 @@
       onclick="getNextHint(this)"
       {% if scenario.hints_used >= scenario.total_hints %}disabled{% endif %}
     >
-      💡 Hint
+      💡 Request Hint
       ({{ scenario.hints_used }}/{{ scenario.total_hints }})
     </button>
 
@@ -100,16 +102,16 @@
   {% endif %}
 </div>
 
-<!-- Result message appears here after Check / Reset / Start -->
+<!-- Result message appears here after actions -->
 <div id="result-message"></div>
 
 <hr />
 
-<!-- ── Hints section ─────────────────────────────────────────────────────── -->
+<!-- ── Requested hints ───────────────────────────────────────────────────── -->
 <div id="hints-section">
-  <h3 style="font-size:0.875rem; font-weight:700; text-transform:uppercase;
-              letter-spacing:0.05em; color:#64748b; margin-bottom:0.75rem;">
-    Hints
+  <h3 style="font-size:0.8rem; font-weight:700; text-transform:uppercase;
+              letter-spacing:0.05em; color:#475569; margin-bottom:0.75rem;">
+    Requested Hints
     {% if scenario.total_hints > 0 %}
     ({{ scenario.hints_used }} of {{ scenario.total_hints }} revealed)
     {% endif %}
@@ -138,9 +140,9 @@
   {% else %}
     <p class="text-muted text-sm">
       {% if scenario.is_active %}
-        No hints revealed yet. Try to solve it on your own first!
+        No hints requested yet. Try to investigate on your own first.
       {% else %}
-        Start the scenario to reveal hints.
+        Accept the ticket to unlock hints.
       {% endif %}
     </p>
   {% endif %}
@@ -171,41 +173,33 @@
 <script>
   const scenarioId = "{{ scenario.id }}";
 
-  // ── Start ─────────────────────────────────────────────────────────────────
   async function startScenario(btn) {
     await withSpinner(btn, async () => {
       const data = await postJSON(`/scenario/${scenarioId}/start`);
       showResult(data);
       if (data.success) {
-        // Reload the page so the button set switches to Active mode
         setTimeout(() => window.location.reload(), 1200);
       }
     });
   }
 
-  // ── Check ─────────────────────────────────────────────────────────────────
   async function checkScenario(btn) {
     await withSpinner(btn, async () => {
       const data = await postJSON(`/scenario/${scenarioId}/check`);
       showResult(data);
       if (data.success) {
-        // Reload to show the Completed badge
         setTimeout(() => window.location.reload(), 2000);
       }
     });
   }
 
-  // ── Hint ──────────────────────────────────────────────────────────────────
   async function getNextHint(btn) {
     await withSpinner(btn, async () => {
       const data = await postJSON(`/scenario/${scenarioId}/hint`);
 
-      // Append the new hint to the list without reloading the whole page.
-      // This feels faster and avoids losing the current result message.
       const section = document.getElementById("hints-section");
       let ol = section.querySelector("ol");
       if (!ol) {
-        // First hint — replace the "no hints yet" paragraph with a list
         ol = document.createElement("ol");
         ol.style.cssText = "list-style:none; padding:0; display:flex; flex-direction:column; gap:0.5rem;";
         section.querySelectorAll("p").forEach(p => p.remove());
@@ -216,23 +210,20 @@
       li.innerHTML = `<span style="color:#f59e0b; font-weight:700; flex-shrink:0;">${data.hint_number}.</span> ${data.hint}`;
       ol.appendChild(li);
 
-      // Update the hint counter in the button label
-      btn.innerHTML = `💡 Hint (${data.hint_number}/${data.total_hints})`;
+      btn.innerHTML = `💡 Request Hint (${data.hint_number}/${data.total_hints})`;
       if (data.hint_number >= data.total_hints) {
         btn.disabled = true;
       }
 
-      // Update the header count
       const header = section.querySelector("h3");
       if (header) {
-        header.innerHTML = `Hints (${data.hint_number} of ${data.total_hints} revealed)`;
+        header.innerHTML = `Requested Hints (${data.hint_number} of ${data.total_hints} revealed)`;
       }
     });
   }
 
-  // ── Reset ─────────────────────────────────────────────────────────────────
   async function resetScenario(btn) {
-    if (!confirm("Reset this scenario? This will delete all lab resources created by setup.")) return;
+    if (!confirm("Reset this ticket? This will delete all lab resources created by setup.")) return;
     await withSpinner(btn, async () => {
       const data = await postJSON(`/scenario/${scenarioId}/reset`);
       showResult(data);
