@@ -6,8 +6,12 @@ python-dotenv==1.0.1
 # PyYAML — parses scenario YAML files
 PyYAML>=6.0
 
-# anthropic — Claude API SDK for grading trainee responses
-anthropic>=0.40.0
+# litellm — unified interface for 100+ LLM providers (OpenAI, Anthropic, Gemini, etc.)
+# Set LITMUS_MODEL in .env to switch providers; install the matching SDK separately:
+#   Anthropic (default):  pip install anthropic
+#   OpenAI / Azure:       pip install openai
+#   Google Gemini:        pip install google-generativeai
+litellm>=1.40.0
 
 # FastAPI + Uvicorn — web framework and ASGI server for the simulation UI
 fastapi>=0.111.0
