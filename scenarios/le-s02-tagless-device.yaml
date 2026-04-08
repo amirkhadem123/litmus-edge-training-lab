@@ -75,3 +75,38 @@ grading_rubric: |
   DEDUCT 15 pts if they didn't explain the Running vs. no-data distinction.
 
   Score range: 0–100. Passing threshold: 70.
+
+scripted_replies:
+  - triggers: ["tag", "tags", "tag list", "tag tab", "configured", "empty", "no tag"]
+    reply: |
+      I found the Tags tab on the device page. You're right — it's completely
+      empty. There's just a message saying "No tags configured." I didn't
+      realise I needed to add anything there. What exactly do I need to add?
+
+  - triggers: ["running", "status", "green", "started", "active", "online"]
+    reply: |
+      Yes, the device shows Running with a solid green indicator. I assumed
+      "Running" meant it was working. Our controls engineer said the same thing —
+      he saw it was green and considered the setup done.
+
+  - triggers: ["register", "address", "modbus", "protocol", "ip", "port", "connection"]
+    reply: |
+      Our controls engineer confirmed: it's Modbus TCP, device IP 10.0.1.55,
+      port 502. He tested the connection separately with a Modbus diagnostic
+      tool and gets valid register readings. The connection itself is fine.
+
+  - triggers: ["historian", "output", "destination", "where", "send", "write"]
+    reply: |
+      We're using the built-in Litmus historian — it's where all our other
+      fifteen devices send their data without any issues. The historian
+      connection is definitely working.
+
+  - triggers: ["polling", "interval", "frequency", "rate", "how often"]
+    reply: |
+      We want it to poll every 5 seconds — that's what our other devices use.
+      Is that something I set when adding tags?
+
+fallback_reply: |
+  I'll need you to walk me through it step by step. My controls engineer
+  set up the device but he's not available right now and I'm less familiar
+  with the Litmus Edge configuration side.

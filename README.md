@@ -173,7 +173,22 @@ The trainee logs into Zendesk and opens the assigned ticket. They will see:
 - Attached screenshots
 - A short diagnostic checklist to prompt structured thinking before responding
 
-The trainee reads the ticket, forms a diagnosis, and writes their response.
+The trainee investigates by asking the customer clarifying questions as ticket
+comments. **The poller (running in step 3) replies automatically as the customer**
+within 60 seconds, using pre-written responses triggered by keywords in the
+trainee's comment. This creates a realistic back-and-forth conversation.
+
+For example:
+> **Trainee:** Can you check what status the device shows in DeviceHub?
+> *(60 seconds later)*
+> **Customer (Carlos Mendes):** I just opened DeviceHub and found PLC-Line3.
+> It has a red icon next to it — the status says "Stopped". Is that the problem?
+
+If the trainee's comment doesn't match any scripted trigger, the customer replies
+with a generic "I need you to be more specific" response (if a `fallback_reply`
+is defined in the scenario). This teaches trainees to ask precise questions.
+
+Once the trainee has enough information, they write their final response.
 
 **If the issue is L0-fixable:** they write a clear, step-by-step solution guide
 addressed to the customer and mark the ticket **Solved**.
@@ -321,6 +336,22 @@ grading_rubric: |
   Use point values (e.g. "CRITICAL (50 pts): ...").
   Specify exact deductions for critical failures.
   Score range: 0–100. Passing threshold: 70.
+
+# Scripted replies — triggered by keywords in the trainee's comments.
+# First matching entry wins. Replies are posted as the ticket requester.
+scripted_replies:
+  - triggers: ["keyword1", "keyword2"]  # any of these (case-insensitive) in comment
+    reply: |
+      The customer's reply text. Written in first person from the customer's
+      perspective. Can be multi-line.
+
+  - triggers: ["other keyword"]
+    reply: |
+      Another customer reply for a different line of questioning.
+
+# Optional: sent when no trigger matches. Teaches trainees to ask precisely.
+fallback_reply: |
+  I'm not sure what you mean. Can you be more specific about what to check?
 ```
 
 Then add screenshots to `scenarios/screenshots/le-s07/` and run

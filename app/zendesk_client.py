@@ -122,12 +122,44 @@ class ZendeskClient:
         resp.raise_for_status()
         return resp.json()["upload"]["token"]
 
+    def post_comment_as_requester(self, ticket_id: int, body: str, requester_id: int) -> dict:
+        """
+        Post a public comment authored by the ticket requester (the 'customer').
+
+        Zendesk allows admin tokens to post on behalf of any user by specifying
+        author_id. This makes the reply appear as a genuine customer response
+        rather than an agent note, preserving the support conversation illusion.
+        """
+        data = self._put(
+            f"/tickets/{ticket_id}.json",
+            {
+                "ticket": {
+                    "comment": {
+                        "body": body,
+                        "public": True,
+                        "author_id": requester_id,
+                    }
+                }
+            },
+        )
+        return data["ticket"]
+
     # ── Search / Lookup ──────────────────────────────────────────────────────
 
     def search_tickets(self, query: str) -> list[dict]:
         """Search tickets using Zendesk query syntax."""
         data = self._get(f"/search.json?query={requests.utils.quote(query)}")
         return data.get("results", [])
+
+    def get_active_training_tickets(self) -> list[dict]:
+        """Return all open (not yet solved) Litmus Lab training tickets."""
+        query = "tags:litmus-lab-training -status:solved -status:closed type:ticket"
+        return self.search_tickets(query)
+
+    def get_me(self) -> dict:
+        """Return the currently authenticated service account user."""
+        data = self._get("/users/me.json")
+        return data["user"]
 
     def _get_user_id(self, email: str) -> int:
         """Look up a user's numeric ID by email."""

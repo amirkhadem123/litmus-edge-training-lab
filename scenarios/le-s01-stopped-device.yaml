@@ -75,3 +75,46 @@ grading_rubric: |
   DEDUCT 20 pts if their remediation steps are technically inaccurate.
 
   Score range: 0–100. Passing threshold: 70.
+
+# ── Scripted customer replies ─────────────────────────────────────────────────
+# Triggered by keywords in the trainee's comment (case-insensitive).
+# First matching entry wins. Replies are posted as the ticket requester.
+
+scripted_replies:
+  - triggers: ["DeviceHub", "device hub", "device status", "status", "running", "stopped", "red", "green", "icon", "badge"]
+    reply: |
+      I just opened DeviceHub and found PLC-Line3. It has a red icon next
+      to it — the status says "Stopped". I assumed it was just a display
+      glitch since the hardware is definitely online. Is that the problem?
+
+  - triggers: ["error", "log", "message", "warning", "alert"]
+    reply: |
+      I checked the logs section. I don't see any obvious error messages
+      related to PLC-Line3 itself. There's a general "device stopped" entry
+      from about 90 minutes ago but no crash or fault code.
+
+  - triggers: ["tag", "data", "value", "publish", "mqtt", "broker", "topic"]
+    reply: |
+      The tag list shows all six of our tags but the "Last Value" and
+      "Last Updated" columns are completely empty for all of them.
+      Our MQTT broker confirms it hasn't received anything from this
+      device's topics since the gap started.
+
+  - triggers: ["restart", "reboot", "power", "cycle", "hardware"]
+    reply: |
+      We haven't restarted anything. The PLC hardware has been running
+      continuously — I can ping it and our SCADA system on a separate
+      network can still query it. This is definitely a Litmus Edge issue,
+      not a hardware issue.
+
+  - triggers: ["change", "update", "modified", "who", "when", "recent"]
+    reply: |
+      Good question. I checked with the team and nobody admits to touching
+      the Litmus Edge configuration. We did have a contractor on-site
+      yesterday doing unrelated electrical work — it's possible someone
+      accidentally clicked something, but I can't confirm that.
+
+fallback_reply: |
+  I'm not very technical on the Litmus Edge side — I just manage the
+  operational side. Can you point me to exactly where to look and what
+  to check? I'm happy to follow step-by-step instructions.

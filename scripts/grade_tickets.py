@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """
-grade_tickets.py — Polling grader for Litmus Lab training tickets.
+grade_tickets.py — Polling engine for Litmus Lab: replies and grading.
 
-Runs continuously (or once with --once), polling Zendesk every 60 seconds for
-solved training tickets that haven't been graded yet. When found, sends the
-full ticket thread to Claude for grading and posts the result as an internal note.
+Runs continuously (or once with --once), polling Zendesk every 60 seconds.
+Each poll cycle does two things in order:
+
+  1. REPLY WATCH — checks active (unsolved) training tickets for new trainee
+     comments and posts scripted customer replies when a trigger matches.
+
+  2. GRADE — checks newly solved training tickets and grades the full response
+     thread with Claude, posting the result as an internal note.
+
+Running both in one script means trainers only need to start one process.
 
 Usage:
     python scripts/grade_tickets.py           # run continuously
-    python scripts/grade_tickets.py --once    # grade pending tickets once and exit
+    python scripts/grade_tickets.py --once    # one poll cycle then exit
 
 Grading logic:
   - Finds tickets tagged 'litmus-lab-training' + status 'solved'
@@ -17,11 +24,17 @@ Grading logic:
   - Loads the matching scenario YAML by 'scenario-{id}' tag
   - Calls Claude to grade the response thread
   - Posts grade as internal note, applies 'litmus-lab-graded' tag
+
+Reply logic:
+  - Finds unsolved tickets tagged 'litmus-lab-training'
+  - For each new public comment from the trainee, checks scenario's
+    scripted_replies triggers (case-insensitive keyword match)
+  - Posts matching reply authored as the ticket requester ('customer' voice)
+  - State persisted in _reply_state.json (gitignored)
 """
 
 import sys
 import time
-import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,10 +45,13 @@ load_dotenv()
 import yaml
 from app.zendesk_client import ZendeskClient
 from app.grader import grade_response, format_internal_note, GradeResult
+from app.reply_watcher import watch_active_tickets
 
 SCENARIOS_DIR = Path(__file__).parent.parent / "scenarios"
 POLL_INTERVAL = 60  # seconds
 
+
+# ── Shared helpers ────────────────────────────────────────────────────────────
 
 def load_scenario_by_id(scenario_id: str) -> dict | None:
     matches = list(SCENARIOS_DIR.glob(f"{scenario_id}-*.yaml"))
@@ -63,13 +79,15 @@ def extract_trainee_email(client: ZendeskClient, ticket: dict) -> str:
         return f"user_id:{assignee_id}"
 
 
+# ── Grading ───────────────────────────────────────────────────────────────────
+
 def grade_ticket(client: ZendeskClient, ticket: dict) -> None:
     ticket_id = ticket["id"]
     tags = ticket.get("tags", [])
 
     scenario_id = extract_scenario_id(tags)
     if not scenario_id:
-        print(f"  [ticket {ticket_id}] No scenario tag found — skipping")
+        print(f"  [ticket {ticket_id}] No scenario tag — skipping")
         return
 
     scenario = load_scenario_by_id(scenario_id)
@@ -77,10 +95,10 @@ def grade_ticket(client: ZendeskClient, ticket: dict) -> None:
         print(f"  [ticket {ticket_id}] Scenario '{scenario_id}' not found on disk — skipping")
         return
 
-    print(f"  [ticket {ticket_id}] Grading scenario '{scenario_id}': {scenario['title']}")
+    print(f"  [ticket {ticket_id}] Grading '{scenario_id}': {scenario['title']}")
 
     comments = client.get_comments(ticket_id)
-    # Filter to public comments only — internal notes are system messages
+    # Pass only public comments — internal notes are system messages, not trainee work
     public_comments = [c for c in comments if c.get("public", True)]
 
     escalated = "escalate" in tags
@@ -90,10 +108,10 @@ def grade_ticket(client: ZendeskClient, ticket: dict) -> None:
         grade: GradeResult = grade_response(scenario, public_comments, escalated)
     except Exception as e:
         print(f"  [ticket {ticket_id}] Grading failed: {e}")
-        # Post a failure note so the trainer knows
         client.post_internal_note(
             ticket_id,
-            f"⚠️ LITMUS LAB: Automatic grading failed for scenario {scenario_id}.\nError: {e}\nPlease grade manually.",
+            f"⚠️ LITMUS LAB: Automatic grading failed for scenario {scenario_id}.\n"
+            f"Error: {e}\nPlease grade manually.",
         )
         client.add_tags(ticket_id, ["litmus-lab-graded"])
         return
@@ -107,40 +125,49 @@ def grade_ticket(client: ZendeskClient, ticket: dict) -> None:
     print(f"  [ticket {ticket_id}] Done — {status} ({grade.score}/100) | action: {action}")
 
 
-def find_ungraded_tickets(client: ZendeskClient) -> list[dict]:
-    # Zendesk search: solved training tickets without the graded tag
-    query = 'tags:litmus-lab-training status:solved -tags:litmus-lab-graded type:ticket'
-    return client.search_tickets(query)
+def run_grader(client: ZendeskClient) -> int:
+    """Grade all currently ungraded solved tickets. Returns count processed."""
+    query = "tags:litmus-lab-training status:solved -tags:litmus-lab-graded type:ticket"
+    tickets = client.search_tickets(query)
 
-
-def run_once(client: ZendeskClient) -> int:
-    """Grade all currently ungraded tickets. Returns count of tickets processed."""
-    tickets = find_ungraded_tickets(client)
     if not tickets:
-        print("No ungraded tickets found.")
         return 0
 
-    print(f"Found {len(tickets)} ungraded ticket(s).")
+    print(f"  [grader] {len(tickets)} ungraded ticket(s) found")
     for ticket in tickets:
         grade_ticket(client, ticket)
 
     return len(tickets)
 
 
+# ── Main poll loop ────────────────────────────────────────────────────────────
+
+def poll(client: ZendeskClient, service_account_id: int) -> None:
+    """One full poll cycle: reply watch first, then grade."""
+    # Step 1 — post scripted replies to active tickets
+    watch_active_tickets(client, load_scenario_by_id, service_account_id)
+
+    # Step 2 — grade newly solved tickets
+    run_grader(client)
+
+
 def main():
     once = "--once" in sys.argv
 
     client = ZendeskClient()
+    service_account_id = client.get_me()["id"]
+    print(f"Service account ID: {service_account_id}")
 
     if once:
-        count = run_once(client)
-        print(f"Done. {count} ticket(s) graded.")
+        poll(client, service_account_id)
+        print("Done.")
         return
 
-    print("Litmus Lab grader started. Polling every 60 seconds. Ctrl+C to stop.")
+    print(f"Litmus Lab poller started (reply watch + grader). "
+          f"Polling every {POLL_INTERVAL}s. Ctrl+C to stop.")
     while True:
         try:
-            run_once(client)
+            poll(client, service_account_id)
         except KeyboardInterrupt:
             print("\nStopped.")
             break

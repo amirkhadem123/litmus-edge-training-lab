@@ -83,3 +83,39 @@ grading_rubric: |
     instead of fixing the root cause (wrong group assignment).
 
   Score range: 0–100. Passing threshold: 70.
+
+scripted_replies:
+  - triggers: ["group", "role", "permission", "access level", "viewer", "admin", "assign"]
+    reply: |
+      I checked David's account in the admin panel under Users. Under
+      "Groups" it shows he's in the "Viewers" group. Our other engineers
+      are all in "Admins". Could that be it? How do I change his group?
+
+  - triggers: ["other user", "other engineer", "colleagues", "same account", "compare", "difference"]
+    reply: |
+      The three other engineers on the OT team can all edit devices, add
+      tags, start and stop devices — no issues. When I compare their account
+      pages to David's, the only difference I can see is the Group assignment.
+
+  - triggers: ["log out", "logout", "log back in", "session", "refresh", "clear cache", "browser"]
+    reply: |
+      David logged out completely, cleared his browser cache, and logged back
+      in on a different browser. Still the same — Edit button greyed out,
+      can't start or stop devices.
+
+  - triggers: ["recreate", "new account", "delete", "fresh"]
+    reply: |
+      We'd prefer to avoid recreating his account if possible. He has several
+      custom dashboard views and saved configurations. But if there's no other
+      option, we can consider it.
+
+  - triggers: ["what is", "explain", "viewer", "difference", "why", "permission mean"]
+    reply: |
+      I see — so the Viewers group is read-only? That makes sense. We set up
+      David's account ourselves without fully reading the documentation.
+      How do I move him to the Admins group, or is there a more limited group
+      that gives edit access without full admin rights?
+
+fallback_reply: |
+  David is available and logged in right now. If you tell me exactly
+  what to click, I can walk him through it immediately.

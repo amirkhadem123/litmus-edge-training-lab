@@ -91,3 +91,46 @@ grading_rubric: |
     the most important diagnostic detail for engineering.
 
   Score range: 0–100. Passing threshold: 70.
+
+scripted_replies:
+  - triggers: ["version", "4.0", "firmware", "which version", "what version", "release"]
+    reply: |
+      We're on Litmus Edge 4.0.5. We were planning to upgrade to 4.0.6 next
+      month during our scheduled maintenance window. We hadn't prioritised
+      it because the release notes didn't mention anything critical for us.
+
+  - triggers: ["log", "error", "message", "console", "output", "what does it say"]
+    reply: |
+      Before I got locked out, I managed to copy this from the logs section:
+
+      [CRIT] auth-service: memory allocation failed after 14h 22m uptime
+      [CRIT] auth-service: worker process terminated unexpectedly (exit code 137)
+      [WARN] session-manager: auth backend unavailable, invalidating all sessions
+      [INFO] session-manager: retry in 30s...
+
+      It kept repeating the last two lines. The screenshot in the original
+      ticket shows this. Does this tell you anything?
+
+  - triggers: ["restart", "reboot", "service restart", "appliance", "power", "console access"]
+    reply: |
+      The appliance is in a locked server room — our facilities manager has
+      the key and he's off-site until this afternoon. We can't physically
+      access it before then. Is there any remote way to restart a service
+      without being able to log into the UI?
+
+  - triggers: ["config", "setting", "configuration", "change", "who", "what changed"]
+    reply: |
+      Nothing was changed in the configuration. The system has been running
+      in the same state for six weeks. This started spontaneously overnight
+      — last confirmed working login was at 21:30 yesterday.
+
+  - triggers: ["other user", "admin", "account", "try different", "another login"]
+    reply: |
+      We tried every account we have — regular users, the main admin account,
+      a service account. All get the same result: spinner then redirect back
+      to the login page with no error message.
+
+fallback_reply: |
+  This is a production environment and we're completely locked out. Every
+  minute counts here. Whatever information you need from me, I'll get it
+  as fast as possible — just tell me what.

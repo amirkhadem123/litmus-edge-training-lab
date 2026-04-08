@@ -80,3 +80,39 @@ grading_rubric: |
     the stopped service.
 
   Score range: 0–100. Passing threshold: 70.
+
+scripted_replies:
+  - triggers: ["service", "services", "ssh service", "system", "stopped", "start"]
+    reply: |
+      I found it! Under System → Services there's a list and SSH shows
+      as "Stopped". There's a Start button next to it. Should I click that?
+      Will it affect anything else that's currently running?
+
+  - triggers: ["firewall", "network", "port 22", "rule", "allow", "block", "inbound"]
+    reply: |
+      Our network team double-checked. The firewall rules haven't changed —
+      port 22 is still open inbound to the Litmus Edge appliance's IP from
+      the engineering VLAN. Same rules as last week when it was working.
+
+  - triggers: ["web", "ui", "browser", "http", "https", "interface", "access"]
+    reply: |
+      Yes, confirmed. The web UI is fully accessible on port 443. I'm logged
+      in right now and DeviceHub, all devices, everything looks normal.
+      Only SSH on port 22 is refusing connections.
+
+  - triggers: ["key", "credential", "certificate", "password", "authentication", "auth"]
+    reply: |
+      We use SSH key-based authentication. The same private key that worked
+      last week. The error occurs before any authentication prompt —
+      the terminal immediately returns "ssh: connect to host port 22:
+      Connection refused" without even attempting the handshake.
+
+  - triggers: ["other", "different", "another", "workstation", "machine", "laptop"]
+    reply: |
+      Yes, we tried from three different engineer workstations — same result
+      on all of them. Two on Windows with PuTTY, one on Linux with native
+      SSH. All get "Connection refused" instantly.
+
+fallback_reply: |
+  I'm on the Litmus Edge UI right now if you want me to check something
+  specific. What section should I navigate to?

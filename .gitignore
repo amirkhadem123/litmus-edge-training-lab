@@ -64,3 +64,8 @@ desktop.ini        # Windows folder customisation
 # ── Scratch / debug scripts ─────────────────────────────────────────────────
 # One-off scripts used during debugging. Not part of the application.
 test_tags.py
+
+# ── Reply watcher state ──────────────────────────────────────────────────────
+# Tracks which Zendesk comment IDs have already been processed by the reply
+# watcher. Machine-local runtime state — must not be committed.
+_reply_state.json

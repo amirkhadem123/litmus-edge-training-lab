@@ -92,3 +92,46 @@ grading_rubric: |
     for data integrity and is a significant L0 failure.
 
   Score range: 0–100. Passing threshold: 70.
+
+scripted_replies:
+  - triggers: ["sensor", "hardware", "instrument", "physical", "real", "actual", "verify", "check hardware"]
+    reply: |
+      Yes, confirmed independently. We put a calibrated handheld meter on
+      the same measurement points as the Litmus Edge sensors:
+      - Tank pressure: 87 PSI (Litmus Edge shows -847,293 PSI)
+      - Furnace temp: 1,203°C (Litmus Edge shows 2,147,483,647°C)
+      The hardware is absolutely fine. This is a Litmus Edge data issue.
+
+  - triggers: ["tag", "data type", "int", "float", "int32", "float64", "type", "format"]
+    reply: |
+      Interesting — I just cross-referenced. All four affected tags are
+      configured as int32 data type. I have three other tags on the same
+      devices using float64, and those are reading correctly right now.
+      Is the int32 type causing this?
+
+  - triggers: ["update", "version", "upgrade", "4.0.6", "when", "started", "since"]
+    reply: |
+      The update to 4.0.6 was applied during our maintenance window last
+      night starting at 02:15. The process completed at 02:47 with no
+      errors reported by the updater. The first shift operator noticed
+      the bad readings at 06:10 this morning when they started their rounds.
+
+  - triggers: ["rollback", "downgrade", "4.0.5", "revert", "previous version"]
+    reply: |
+      A rollback isn't feasible for us. Our maintenance windows are monthly
+      and strictly controlled — we can't schedule one before next month.
+      We also need the 4.0.6 security patches to stay in compliance. We
+      need a solution that works on 4.0.6.
+
+  - triggers: ["other device", "other tag", "float", "working", "not affected", "which tags"]
+    reply: |
+      Let me check... The affected tags are: TankPressure_PSI (int32),
+      FurnaceTemp_C (int32), CoolantFlow_LPM (int32), LineSpeed_RPM (int32).
+      Working fine: CoolantTemp_C (float64), AmbientTemp_C (float64),
+      PowerDraw_KW (float64). Pattern is clear — every int32 tag is broken,
+      every float64 tag is fine.
+
+fallback_reply: |
+  This is affecting production data quality and our quality records for
+  this shift may be compromised. Tell me exactly what you need and I'll
+  pull it immediately.
