@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% block title %}#{{ ticket.id }} — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+/* ── Two-column ticket layout ─────────────────────────────────────────── */
+.ticket-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .ticket-layout { grid-template-columns: 1fr; }
+}
+
+/* ── Ticket header ────────────────────────────────────────────────────── */
+.ticket-header {
+  margin-bottom: 1.5rem;
+}
+.ticket-header-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.ticket-number { color: #64748b; font-size: 0.85rem; font-family: monospace; }
+.ticket-subject {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.3;
+  margin-bottom: 0.4rem;
+}
+.ticket-meta { color: #64748b; font-size: 0.85rem; }
+.ticket-meta strong { color: #94a3b8; }
+
+/* ── Conversation thread ──────────────────────────────────────────────── */
+.thread { display: flex; flex-direction: column; gap: 1rem; }
+
+.comment {
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.comment-time { font-weight: 400; text-transform: none; letter-spacing: 0; color: #4b5563; }
+
+.comment-customer {
+  background: #1a2035;
+  border-left: 3px solid #38bdf8;
+}
+.comment-customer .comment-header { color: #38bdf8; }
+
+.comment-trainee {
+  background: #1a2a1a;
+  border-left: 3px solid #4ade80;
+}
+.comment-trainee .comment-header { color: #4ade80; }
+
+.comment-internal {
+  background: #1c1207;
+  border: 1px solid #854d0e;
+  border-left: 3px solid #d97706;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+}
+.comment-internal .comment-header { color: #d97706; }
+
+/* ── Reply form ───────────────────────────────────────────────────────── */
+.reply-section {
+  margin-top: 1.5rem;
+  background: #1a1d2e;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+.reply-section h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.85rem;
+}
+textarea.reply-box {
+  min-height: 110px;
+  resize: vertical;
+  margin-bottom: 1rem;
+}
+.reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.escalate-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+.escalate-toggle input[type="checkbox"] {
+  width: auto;
+  accent-color: #f97316;
+  cursor: pointer;
+}
+.escalate-active { color: #f97316; font-weight: 600; }
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+.sidebar-card {
+  background: #1a1d2e;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.sidebar-card h4 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 0.85rem;
+}
+
+.customer-field { margin-bottom: 0.6rem; font-size: 0.875rem; }
+.customer-field .label { color: #64748b; font-size: 0.75rem; display: block; }
+.customer-field .value { color: #e2e8f0; }
+
+.screenshot-thumb {
+  display: block;
+  width: 100%;
+  border-radius: 5px;
+  border: 1px solid #2d3748;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.screenshot-thumb:hover { border-color: #60a5fa; }
+
+.checklist { list-style: none; }
+.checklist li {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #1e293b;
+  line-height: 1.4;
+}
+.checklist li:last-child { border-bottom: none; }
+.checklist li::before { content: "□ "; color: #4b5563; }
+
+/* ── Solved state ─────────────────────────────────────────────────────── */
+.solved-banner {
+  background: #052e16;
+  border: 1px solid #166534;
+  border-radius: 8px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.25rem;
+  color: #86efac;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* ── Screenshot lightbox ──────────────────────────────────────────────── */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox.active { display: flex; }
+.lightbox img {
+  max-width: 92vw;
+  max-height: 88vh;
+  border-radius: 6px;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+}
+{% endblock %}
+
+{% block content %}
+
+{# ── Ticket header ─────────────────────────────────────────────────────── #}
+<div class="ticket-header">
+  <div class="ticket-header-top">
+    <span class="ticket-number">#{{ ticket.id }}</span>
+    {% if ticket.status == 'solved' %}
+      <span class="badge badge-solved">Solved</span>
+    {% else %}
+      <span class="badge badge-open">Open</span>
+    {% endif %}
+    {% if ticket.escalated %}
+      <span class="badge badge-escalate">Escalated</span>
+    {% endif %}
+    <span class="badge badge-{{ scenario.difficulty }}">{{ scenario.difficulty }}</span>
+  </div>
+  <div class="ticket-subject">{{ scenario.ticket.subject }}</div>
+  <div class="ticket-meta">
+    Trainee: <strong>{{ ticket.trainee }}</strong>
+    &nbsp;·&nbsp; Scenario: <strong>{{ scenario.id }}</strong>
+  </div>
+</div>
+
+{% if ticket.status == 'solved' %}
+<div class="solved-banner">
+  ✓ This ticket has been solved.
+  {% if ticket.score is not none %}
+    Score: <strong>{{ ticket.score }}/100</strong>
+    {% if ticket.score >= 70 %}— Passed{% else %}— Did not pass{% endif %}
+  {% endif %}
+  Scroll down to see the grading note.
+</div>
+{% endif %}
+
+{# ── Two-column layout ─────────────────────────────────────────────────── #}
+<div class="ticket-layout">
+
+  {# Left column: thread + reply form #}
+  <div>
+
+    <div class="thread">
+      {% for comment in public_comments %}
+        {% if comment.author_type == 'customer' %}
+          <div class="comment comment-customer">
+            <div class="comment-header">
+              {{ scenario.customer.name }}
+              <span class="comment-time">{{ comment.created_at[11:16] }}</span>
+            </div>
+            {{ comment.body }}
+          </div>
+        {% elif comment.author_type == 'trainee' %}
+          <div class="comment comment-trainee">
+            <div class="comment-header">
+              {{ ticket.trainee }}
+              <span class="comment-time">{{ comment.created_at[11:16] }}</span>
+            </div>
+            {{ comment.body }}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {# Grade note (internal) — shown only when solved #}
+    {% for note in internal_notes %}
+    <div class="comment comment-internal" style="margin-top:1.5rem;">
+      <div class="comment-header">Litmus Lab — Training Grade</div>
+      {{ note.body }}
+    </div>
+    {% endfor %}
+
+    {# Reply form — hidden once solved #}
+    {% if ticket.status == 'open' %}
+    <div class="reply-section">
+      <h3>Your Reply</h3>
+      <form action="/tickets/{{ ticket.id }}/reply" method="post">
+        <textarea
+          name="body"
+          class="reply-box"
+          placeholder="Ask the customer a question or provide guidance…"
+          required
+        ></textarea>
+        <div class="reply-actions">
+          <label class="escalate-toggle {% if ticket.escalated %}escalate-active{% endif %}">
+            <input
+              type="checkbox"
+              name="escalated"
+              value="1"
+              {% if ticket.escalated %}checked{% endif %}
+            />
+            Mark as Escalation
+          </label>
+          <button type="submit" class="btn btn-ghost">Reply</button>
+        </div>
+      </form>
+
+      <hr />
+
+      <form action="/tickets/{{ ticket.id }}/solve" method="post" onsubmit="return confirmSolve(this)">
+        <textarea
+          name="body"
+          class="reply-box"
+          placeholder="(Optional) Write your final response to the customer before solving…"
+        ></textarea>
+        <div class="reply-actions">
+          <label class="escalate-toggle {% if ticket.escalated %}escalate-active{% endif %}">
+            <input
+              type="checkbox"
+              name="escalated"
+              value="1"
+              {% if ticket.escalated %}checked{% endif %}
+            />
+            Mark as Escalation
+          </label>
+          <button type="submit" class="btn btn-success">
+            ✓ Solve Ticket →
+          </button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>{# end left column #}
+
+  {# Right column: sidebar #}
+  <div>
+
+    {# Customer info #}
+    <div class="sidebar-card">
+      <h4>Customer</h4>
+      <div class="customer-field">
+        <span class="label">Name</span>
+        <span class="value">{{ scenario.customer.name }}</span>
+      </div>
+      <div class="customer-field">
+        <span class="label">Company</span>
+        <span class="value">{{ scenario.customer.company }}</span>
+      </div>
+      <div class="customer-field">
+        <span class="label">Litmus Edge Version</span>
+        <span class="value">{{ scenario.customer.le_version }}</span>
+      </div>
+    </div>
+
+    {# Screenshots #}
+    {% if scenario.ticket.attachments %}
+    <div class="sidebar-card">
+      <h4>Attachments</h4>
+      {% for attachment in scenario.ticket.attachments %}
+        <img
+          src="/screenshots/{{ attachment }}"
+          alt="{{ attachment }}"
+          class="screenshot-thumb"
+          onclick="openLightbox(this.src)"
+          onerror="this.style.display='none'"
+        />
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Diagnostic checklist #}
+    <div class="sidebar-card">
+      <h4>Diagnostic Checklist</h4>
+      <ul class="checklist">
+        {% for item in scenario.diagnostic_checklist %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+  </div>{# end right column #}
+</div>
+
+{# Lightbox for full-size screenshots #}
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="Screenshot" />
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function confirmSolve(form) {
+    return confirm("Solve this ticket? The response will be graded immediately (takes ~2–3 seconds).");
+  }
+
+  function openLightbox(src) {
+    document.getElementById("lightbox-img").src = src;
+    document.getElementById("lightbox").classList.add("active");
+  }
+
+  function closeLightbox() {
+    document.getElementById("lightbox").classList.remove("active");
+  }
+
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeLightbox();
+  });
+
+  // Keep escalate checkboxes in both forms in sync
+  const checkboxes = document.querySelectorAll('input[name="escalated"]');
+  checkboxes.forEach(cb => {
+    cb.addEventListener("change", () => {
+      const val = cb.checked;
+      checkboxes.forEach(other => {
+        other.checked = val;
+        const label = other.closest(".escalate-toggle");
+        if (label) label.classList.toggle("escalate-active", val);
+      });
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Litmus Lab{% endblock %}</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header ───────────────────────────────────────────────────────── */
+    .header {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3748;
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .header-logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.4px;
+    }
+    .header-logo span { color: #38bdf8; }
+    .header-nav { display: flex; gap: 1rem; margin-left: auto; }
+    .header-nav a {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      padding: 0.3rem 0.7rem;
+      border-radius: 5px;
+    }
+    .header-nav a:hover { background: #1e293b; color: #e2e8f0; text-decoration: none; }
+
+    /* ── Layout ───────────────────────────────────────────────────────── */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1.1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.85; text-decoration: none; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: #2563eb; color: #fff; }
+    .btn-success  { background: #16a34a; color: #fff; }
+    .btn-danger   { background: #dc2626; color: #fff; }
+    .btn-warning  { background: #d97706; color: #fff; }
+    .btn-ghost    { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+    /* ── Badges ───────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-open     { background: #1d4ed8; color: #bfdbfe; }
+    .badge-solved   { background: #065f46; color: #6ee7b7; }
+    .badge-escalate { background: #7c2d12; color: #fdba74; }
+    .badge-beginner     { background: #14532d; color: #86efac; }
+    .badge-intermediate { background: #78350f; color: #fcd34d; }
+    .badge-advanced     { background: #4c1d95; color: #c4b5fd; }
+
+    /* ── Alert boxes ──────────────────────────────────────────────────── */
+    .alert {
+      padding: 0.85rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid;
+    }
+    .alert-warning { background: #1c1207; border-color: #d97706; color: #fde68a; }
+    .alert-info    { background: #0c1a2e; border-color: #3b82f6; color: #93c5fd; }
+    .alert-success { background: #052e16; border-color: #16a34a; color: #86efac; }
+    .alert-error   { background: #1a0a0a; border-color: #dc2626; color: #fca5a5; }
+
+    /* ── Form elements ────────────────────────────────────────────────── */
+    input[type="text"], select, textarea {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 0.5rem 0.75rem;
+      width: 100%;
+    }
+    input[type="text"]:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+    label {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    .form-group { margin-bottom: 1.25rem; }
+
+    /* ── Spinner ──────────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Misc ─────────────────────────────────────────────────────────── */
+    .mt-1 { margin-top: 0.5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .mt-3 { margin-top: 1.5rem; }
+    .text-muted { color: #64748b; font-size: 0.85rem; }
+    hr { border: none; border-top: 1px solid #1e293b; margin: 1.5rem 0; }
+
+    {% block extra_styles %}{% endblock %}
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-logo"><span>Litmus</span> Lab</div>
+    <nav class="header-nav">
+      <a href="/">Ticket Queue</a>
+      <a href="/new">+ New Ticket</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

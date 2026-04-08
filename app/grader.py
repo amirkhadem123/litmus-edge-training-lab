@@ -1,5 +1,5 @@
 """
-grader.py — Claude API integration for grading trainee Zendesk responses.
+grader.py — Claude API integration for grading trainee responses.
 
 Sends the full ticket thread + scenario rubric to Claude and returns a
 structured GradeResult. Uses claude-haiku for speed and cost efficiency.
@@ -33,8 +33,8 @@ def grade_response(scenario: dict, ticket_thread: list[dict], escalated: bool) -
 
     Args:
         scenario:      Parsed scenario YAML dict.
-        ticket_thread: List of Zendesk comment dicts (in chronological order).
-        escalated:     True if the trainee applied the 'escalate' tag.
+        ticket_thread: List of comment dicts (in chronological order).
+        escalated:     True if the trainee checked the escalation box.
 
     Returns:
         GradeResult with score, feedback, and key issues.
@@ -116,7 +116,7 @@ The score must reflect the rubric point deductions. Do not be lenient about crit
 
 
 def format_internal_note(grade: GradeResult, scenario: dict, trainee_email: str) -> str:
-    """Format a GradeResult as a Zendesk internal note body."""
+    """Format a GradeResult as a training grade report."""
     status_icon = "✅" if grade.passed else "❌"
     action_icon = "✅" if grade.action_correct else "❌"
     expected = scenario["expected_action"].upper()
@@ -144,11 +144,16 @@ Graded automatically by Litmus Lab · Claude {GRADING_MODEL}"""
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _format_thread(comments: list[dict]) -> str:
-    """Convert Zendesk comment list into a readable transcript."""
+    """Convert the local comment list into a readable transcript for Claude."""
+    author_labels = {
+        "customer": "CUSTOMER",
+        "trainee":  "TRAINEE",
+        "system":   "SYSTEM",
+    }
     lines = []
     for i, comment in enumerate(comments, 1):
-        author = comment.get("author_id", "unknown")
-        public = "PUBLIC" if comment.get("public", True) else "INTERNAL"
+        author_type = comment.get("author_type", "unknown")
+        label = author_labels.get(author_type, author_type.upper())
         body = comment.get("body", "").strip()
-        lines.append(f"[Comment {i} — {public} — author_id:{author}]\n{body}\n")
+        lines.append(f"[Comment {i} — {label}]\n{body}\n")
     return "\n".join(lines)

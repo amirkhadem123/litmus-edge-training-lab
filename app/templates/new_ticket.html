@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}New Ticket — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+.form-card {
+  background: #1a1d2e;
+  border: 1px solid #2d3748;
+  border-radius: 10px;
+  padding: 2rem;
+  max-width: 580px;
+  margin: 0 auto;
+}
+.form-card h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 0.4rem;
+}
+.form-card .subtitle {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-bottom: 1.75rem;
+}
+
+.scenario-option-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-left: 0.5rem;
+}
+
+select option { background: #1e293b; }
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="form-card">
+  <h2>Create Training Ticket</h2>
+  <p class="subtitle">Select a scenario and enter the trainee's name to generate the ticket.</p>
+
+  <form action="/tickets/new" method="post">
+    <div class="form-group">
+      <label for="scenario_id">Scenario</label>
+      <select name="scenario_id" id="scenario_id" required>
+        {% for s in scenarios %}
+        <option value="{{ s.id }}">
+          {{ s.id }} — {{ s.title }}
+          ({{ s.difficulty }} · {{ s.expected_action }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="trainee">Trainee Name</label>
+      <input
+        type="text"
+        name="trainee"
+        id="trainee"
+        placeholder="e.g. Jane Doe"
+        required
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="form-actions">
+      <a href="/" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary">Create Ticket →</button>
+    </div>
+  </form>
+</div>
+
+<div style="max-width:580px; margin: 1.5rem auto 0;">
+  <div class="alert alert-info">
+    <strong>Suggested order:</strong> le-s01 → le-s02 → le-s03 → le-s04 (resolve scenarios first,
+    then le-s05 → le-s06 (escalation scenarios).
+  </div>
+</div>
+{% endblock %}

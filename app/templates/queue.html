@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Ticket Queue — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.page-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+.page-title .count {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #1e293b;
+}
+td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #1a2035;
+  vertical-align: middle;
+}
+tr:hover td { background: #111827; }
+tr:last-child td { border-bottom: none; }
+
+.ticket-id { color: #64748b; font-size: 0.8rem; font-family: monospace; }
+.scenario-title { font-weight: 500; color: #e2e8f0; }
+.trainee-name { color: #94a3b8; }
+
+.score-pass { color: #4ade80; font-weight: 700; }
+.score-fail { color: #f87171; font-weight: 700; }
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #4b5563;
+}
+.empty-state h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #6b7280; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    Ticket Queue
+    <span class="count">{{ tickets|length }} ticket{{ 's' if tickets|length != 1 }}</span>
+  </h1>
+  <a href="/new" class="btn btn-primary">+ New Ticket</a>
+</div>
+
+{% if tickets %}
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Scenario</th>
+      <th>Trainee</th>
+      <th>Status</th>
+      <th>Score</th>
+      <th>Created</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ticket in tickets %}
+    <tr>
+      <td><span class="ticket-id">#{{ ticket.id }}</span></td>
+      <td>
+        <a href="/tickets/{{ ticket.id }}" class="scenario-title">
+          {{ ticket.scenario_title }}
+        </a>
+        <div class="text-muted" style="margin-top:0.2rem;">{{ ticket.scenario_id }}</div>
+      </td>
+      <td><span class="trainee-name">{{ ticket.trainee }}</span></td>
+      <td>
+        {% if ticket.status == 'solved' %}
+          <span class="badge badge-solved">Solved</span>
+          {% if ticket.escalated %}
+            <span class="badge badge-escalate" style="margin-left:0.3rem;">Escalated</span>
+          {% endif %}
+        {% else %}
+          <span class="badge badge-open">Open</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if ticket.score is not none %}
+          <span class="{{ 'score-pass' if ticket.score >= 70 else 'score-fail' }}">
+            {{ ticket.score }}/100
+          </span>
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </td>
+      <td class="text-muted">{{ ticket.created_at[:16].replace('T', ' ') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<div class="empty-state">
+  <h3>No tickets yet</h3>
+  <p>Create a training ticket to get started.</p>
+  <a href="/new" class="btn btn-primary" style="margin-top:1.25rem;">Create First Ticket</a>
+</div>
+{% endif %}
+{% endblock %}

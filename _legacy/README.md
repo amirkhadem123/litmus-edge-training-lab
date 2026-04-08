@@ -1,10 +1,8 @@
-# Legacy Code — Litmus Lab Phase 1 & Phase 2 (Live LE Approach)
+# Legacy Code — Litmus Lab Phases 1, 2 & 3 (Retired Approaches)
 
-This directory contains the original Litmus Lab application, which was retired
-in favour of the Zendesk-based L0 training approach on the `feature/zendesk-l0-training`
-branch.
+This directory contains retired Litmus Lab application code from three earlier phases.
 
-**Do not delete this directory until the new system is fully validated in production.**
+**Do not delete this directory until the current system is fully validated in production.**
 
 ---
 
@@ -47,13 +45,50 @@ scalable L0 support training:
    from screenshots, write clear remediation steps, and know when to escalate.
    None of that requires touching LE directly.
 
-### What replaced it
+### What replaced it (Phase 3 — Zendesk-based)
 
-See the project root for the Zendesk-based approach:
-- `scenarios/` — YAML scenario files (content-based, no SDK needed)
-- `scripts/` — Trainer CLI tools
-- `app/zendesk_client.py` — Zendesk REST API wrapper
-- `app/grader.py` — Claude API grading
+See `_legacy/zendesk-phase/` for what came next: a Zendesk-integrated system
+that created real Zendesk tickets and polled for solved ones to grade them.
+That approach was also retired — see below.
+
+---
+
+## Phase 3 — Zendesk Integration (also retired)
+
+### What was here
+
+`_legacy/zendesk-phase/` contains the Zendesk-based training system:
+
+- `zendesk_client.py` — Zendesk REST API wrapper (ticket creation, comments, search)
+- `reply_watcher.py` — Polls for active tickets and posts scripted customer replies
+- `create_ticket.py` — CLI: `python scripts/create_ticket.py le-s01 trainee@company.com`
+- `grade_tickets.py` — Background poller: grades solved tickets via Claude, posts internal notes
+
+**Architecture:**
+- No web server — just Python scripts and a Zendesk account
+- Trainees worked entirely within real Zendesk
+- Scripted customer replies triggered by keyword matching in trainee comments
+- Claude graded responses when trainee marked ticket Solved
+
+**Why it was retired:**
+
+The Zendesk API integration worked well, but it was determined that the training
+goal is **diagnostic and escalation skills**, not Zendesk familiarity (trainees
+have separate Zendesk onboarding). Requiring a real Zendesk account, API tokens,
+and a service account added unnecessary friction for running a training session.
+A self-contained simulation achieves the same educational outcome without
+any external account dependencies.
+
+### What replaced it (Phase 4 — current)
+
+See the project root for the self-contained FastAPI simulation:
+- `app/main.py` — FastAPI web app (ticket queue, conversation view, grading)
+- `app/database.py` — SQLite persistence (tickets + comments)
+- `app/templates/` — Jinja2 ticket UI (dark-themed, Zendesk-like)
+- `app/grader.py` — Claude API grading (unchanged from Phase 3)
+- `scenarios/` — YAML scenario files (unchanged)
+
+Start with: `uvicorn app.main:app --reload`
 
 ### Scenario knowledge preserved
 
