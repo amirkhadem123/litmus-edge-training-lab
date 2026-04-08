@@ -15,12 +15,12 @@ Routes:
 
 from pathlib import Path
 
+import jinja2
 import yaml
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from app.database import (
     add_comment,
@@ -47,7 +47,20 @@ app.mount(
     name="screenshots",
 )
 
-templates = Jinja2Templates(directory="app/templates")
+# Render templates directly with Jinja2 (bypasses Starlette's Jinja2Templates
+# wrapper, which has a Python 3.14 incompatibility in its LRUCache).
+# cache_size=0 disables template caching — fine for a local training tool.
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader("app/templates"),
+    cache_size=0,
+)
+
+
+def _render(template_name: str, **context) -> HTMLResponse:
+    """Render a Jinja2 template and return an HTMLResponse."""
+    template = _jinja_env.get_template(template_name)
+    return HTMLResponse(template.render(**context))
+
 
 SCENARIOS_DIR = Path("scenarios")
 
@@ -102,20 +115,14 @@ async def queue(request: Request) -> HTMLResponse:
     for ticket in tickets:
         scenario = load_scenario(ticket["scenario_id"])
         ticket["scenario_title"] = scenario["title"] if scenario else ticket["scenario_id"]
-    return templates.TemplateResponse(
-        "queue.html",
-        {"request": request, "tickets": tickets},
-    )
+    return _render("queue.html", tickets=tickets)
 
 
 @app.get("/new", response_class=HTMLResponse)
 async def new_ticket_form(request: Request) -> HTMLResponse:
     """Create ticket form — trainer selects scenario and enters trainee name."""
     scenarios = load_all_scenarios()
-    return templates.TemplateResponse(
-        "new_ticket.html",
-        {"request": request, "scenarios": scenarios},
-    )
+    return _render("new_ticket.html", scenarios=scenarios)
 
 
 @app.post("/tickets/new")
@@ -148,15 +155,12 @@ async def view_ticket(request: Request, ticket_id: int) -> HTMLResponse:
     public_comments = [c for c in comments if not c["is_internal"]]
     internal_notes  = [c for c in comments if c["is_internal"]]
 
-    return templates.TemplateResponse(
+    return _render(
         "ticket.html",
-        {
-            "request": request,
-            "ticket": ticket,
-            "scenario": scenario,
-            "public_comments": public_comments,
-            "internal_notes": internal_notes,
-        },
+        ticket=ticket,
+        scenario=scenario,
+        public_comments=public_comments,
+        internal_notes=internal_notes,
     )
 
 
