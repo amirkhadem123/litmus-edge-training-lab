@@ -216,11 +216,22 @@ async def solve(
 
     # Grade before closing so we can store the score on the ticket
     public_comments = [c for c in get_comments(ticket_id) if not c["is_internal"]]
-    grade = grade_response(scenario, public_comments, is_escalated)
+    try:
+        grade = grade_response(scenario, public_comments, is_escalated)
+        solve_ticket(ticket_id, score=grade.score)
+        note_body = format_internal_note(grade, scenario, ticket["trainee"])
+    except Exception as exc:
+        # LLM call failed (missing API key, network error, bad JSON, etc.)
+        # Still mark the ticket solved so the trainee isn't stuck,
+        # but post the error as the internal note so it's visible.
+        solve_ticket(ticket_id, score=None)
+        note_body = (
+            f"GRADING FAILED — ticket marked solved without a score.\n\n"
+            f"Error: {type(exc).__name__}: {exc}\n\n"
+            f"Check that LITMUS_MODEL and the matching API key are set in .env, "
+            f"then re-run the server."
+        )
 
-    solve_ticket(ticket_id, score=grade.score)
-
-    note_body = format_internal_note(grade, scenario, ticket["trainee"])
     add_comment(ticket_id, note_body, "system", is_internal=True)
 
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
