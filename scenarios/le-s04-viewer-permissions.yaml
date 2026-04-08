@@ -1,0 +1,85 @@
+id: le-s04
+title: Engineer cannot modify device configuration
+difficulty: intermediate
+expected_action: resolve
+
+customer:
+  name: Fatima Al-Rashid
+  company: Gulf Coast Petrochemical
+  le_version: "4.0.6"
+
+ticket:
+  subject: "New team member can't edit devices — buttons are greyed out"
+  initial_message: |
+    Hello Litmus support,
+
+    We added a new controls engineer to our Litmus Edge instance last week.
+    His account was created successfully and he can log in fine, but he cannot
+    make any changes in DeviceHub. When he opens a device, the Edit button is
+    greyed out. He also cannot start/stop devices or add tags.
+
+    Our other engineers on the same team don't have this issue — they can all
+    edit devices without a problem.
+
+    The new engineer's name is David Park. His username is dpark. I've attached
+    a screenshot showing the greyed-out UI on his account, and another showing
+    his account settings page in the Litmus Edge admin panel.
+
+    Is there a permissions setting we're missing? We set up his account the same
+    way we thought we set up the others.
+
+    Fatima Al-Rashid
+    OT Systems Administrator, Gulf Coast Petrochemical
+
+  attachments:
+    - le-s04/device_view_greyed_buttons.png
+    - le-s04/user_account_settings.png
+
+diagnostic_checklist:
+  - "The screenshot shows his account settings — what role or group is he assigned to?"
+  - "Litmus Edge has built-in user groups with different permission levels — what are they?"
+  - "The other engineers can edit devices — what is likely different about their group assignment?"
+
+root_cause: |
+  The new user David Park (dpark) has been assigned to the "Viewer" group (or equivalent
+  read-only group) in Litmus Edge RBAC. Viewer-level users can see the DeviceHub
+  interface but all write operations (edit, start, stop, add tags) are disabled.
+  The other engineers are in the default Admins or Operators group which grants
+  full DeviceHub access.
+  Resolution: an administrator needs to reassign dpark to an appropriate group
+  (e.g., the default Admins group or a custom group with DeviceHub write permissions)
+  in the Litmus Edge admin panel under Users & Groups.
+
+correct_response_summary: |
+  1. Identify from the screenshot that dpark is assigned to a Viewer/read-only group
+  2. Explain that Litmus Edge RBAC controls what each user can do — Viewer role is read-only
+  3. Guide customer: Litmus Edge UI → Admin → Users & Groups → find dpark → change group
+     to Admins (or appropriate group with edit permissions)
+  4. Ask customer to have David log out and back in to pick up the new permissions
+  5. Confirm he can now edit devices
+
+grading_rubric: |
+  Evaluate the trainee's full response to this ticket.
+
+  CRITICAL (50 pts): Did the trainee correctly identify that the user is in a
+    read-only (Viewer) group as the root cause of the greyed-out buttons?
+    The user account settings screenshot makes this clear. Failing to read the
+    screenshot and diagnose the RBAC issue scores at most 20 pts.
+
+  IMPORTANT (25 pts): Did the trainee provide correct remediation?
+    Required path: Admin → Users & Groups → find user → change group assignment.
+    Also important: advise the customer to log out/in after changing the group.
+
+  QUALITY (15 pts): Did the trainee explain *why* the Viewer group causes this
+    behaviour? Good L0 support educates the customer so they can handle similar
+    issues independently in future.
+
+  VERIFICATION (10 pts): Did they ask the customer to confirm David can edit
+    devices after the group change?
+
+  DEDUCT 40 pts if the trainee escalated. Group assignment is a routine admin
+    task in Litmus Edge — no engineering involvement needed.
+  DEDUCT 20 pts if they suggested a workaround (e.g., "create a new user account")
+    instead of fixing the root cause (wrong group assignment).
+
+  Score range: 0–100. Passing threshold: 70.

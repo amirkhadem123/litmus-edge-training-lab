@@ -1,0 +1,93 @@
+id: le-s05
+title: All users randomly logged out — authentication errors in logs
+difficulty: intermediate
+expected_action: escalate
+
+customer:
+  name: Henrik Larsson
+  company: Nordic Pulp & Paper
+  le_version: "4.0.5"
+
+ticket:
+  subject: "URGENT: Litmus Edge booting all users, authentication broken"
+  initial_message: |
+    This is urgent. Since approximately 06:00 this morning, all users on our
+    Litmus Edge instance are being randomly logged out and cannot log back in.
+    The login screen accepts credentials, shows a spinner, then returns to the
+    login page with no error message. This is affecting ALL user accounts,
+    including administrator accounts.
+
+    The web UI is accessible. DeviceHub devices appear to still be running and
+    sending data. Only authentication is broken.
+
+    I found the error logs through the System → Logs section before I was
+    also logged out. I've attached the relevant log excerpt as a screenshot.
+    The logs show repeated errors from an authentication-related service
+    involving memory allocation failures.
+
+    We are on Litmus Edge version 4.0.5. This is a production system —
+    operators cannot access the UI to monitor or modify anything.
+
+    Henrik Larsson
+    Head of OT Infrastructure, Nordic Pulp & Paper
+
+  attachments:
+    - le-s05/auth_error_logs.png
+    - le-s05/login_spinner_loop.png
+
+diagnostic_checklist:
+  - "What does the log screenshot tell you about which component is failing?"
+  - "Is this a configuration issue, a network issue, or something in the platform itself?"
+  - "What is the Litmus Edge version shown in the ticket, and could this matter?"
+
+root_cause: |
+  The authentication service in Litmus Edge 4.0.5 has a known memory leak that
+  causes the service to crash under sustained load after approximately 12–24 hours
+  of uptime. When the auth service crashes, all active sessions are invalidated and
+  new logins fail silently (spinner → redirect) because the auth backend is
+  unavailable. This is a confirmed platform bug fixed in Litmus Edge 4.0.6.
+  This cannot be resolved at L0. The customer requires an engineering-assisted
+  upgrade to Litmus Edge 4.0.6 and potentially a temporary workaround (service
+  restart via appliance console) to restore immediate access.
+
+escalation_reason: |
+  This is a confirmed firmware/platform bug in LE 4.0.5, not a configuration issue.
+  L0 cannot perform firmware upgrades or appliance-level service restarts.
+  Requires engineering involvement to:
+    1. Guide customer through appliance console service restart (temporary fix)
+    2. Plan and execute the 4.0.5 → 4.0.6 upgrade procedure
+
+grading_rubric: |
+  Evaluate the trainee's full response to this ticket.
+
+  CRITICAL (50 pts): Did the trainee apply the 'escalate' tag?
+    This is binary: YES = full 50 pts, NO = 0 pts for this section and
+    an automatic cap of 50/100 for the overall score.
+
+  IMPORTANT (25 pts): Does the trainee's escalation note contain all necessary
+    context for the engineering team?
+    Required elements:
+      - Customer name and company
+      - Litmus Edge version (4.0.5 — critical for engineers to know)
+      - Description of the symptom (auth failures, all users affected)
+      - Reference to the log error screenshot (engineers need this)
+      - Impact statement (production system, operators locked out)
+    Score proportionally based on how many elements are present.
+
+  QUALITY (15 pts): Did the trainee communicate professionally to the customer?
+    A good escalation response:
+      - Acknowledges urgency
+      - Tells the customer the issue is being escalated to engineering
+      - Sets a reasonable expectation (does NOT promise a fix time they can't commit to)
+      - Does NOT attempt to explain the root cause in detail (they shouldn't know it)
+
+  RESTRAINT (10 pts): Did the trainee avoid attempting a fix they cannot do at L0?
+    Common mistakes: telling customer to restart the service (they can't from UI),
+    suggesting a reinstall, or recommending config changes that won't help.
+
+  DEDUCT 50 pts if the trainee did NOT escalate and instead attempted a resolution.
+    Attempting to fix a firmware bug at L0 is a critical failure.
+  DEDUCT 20 pts if the escalation note is missing LE version (4.0.5) — this is
+    the most important diagnostic detail for engineering.
+
+  Score range: 0–100. Passing threshold: 70.

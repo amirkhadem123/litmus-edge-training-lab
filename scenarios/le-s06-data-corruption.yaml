@@ -1,0 +1,94 @@
+id: le-s06
+title: Tag values showing impossible readings after system update
+difficulty: advanced
+expected_action: escalate
+
+customer:
+  name: Yuki Tanaka
+  company: Precision Automotive Systems
+  le_version: "4.0.6"
+
+ticket:
+  subject: "Corrupt sensor values after last night's Litmus Edge update"
+  initial_message: |
+    We performed the recommended update to Litmus Edge 4.0.6 last night during
+    our maintenance window. Since the update, several of our temperature and
+    pressure tags are showing readings that are physically impossible.
+
+    Examples from this morning:
+    - Tank pressure sensor: reading -847,293 PSI (actual range: 0–200 PSI)
+    - Furnace temp sensor: reading 2,147,483,647 °C (should be ~1,200 °C)
+    - Coolant flow: alternating between 0 and max value every 2 seconds
+
+    The physical sensors themselves are verified to be working correctly —
+    we checked with standalone instrumentation. Other tags on the same devices
+    are reading fine. The affected tags are all int32 type.
+
+    This started immediately after the 4.0.6 update. Rolling back would require
+    another maintenance window which we cannot schedule before next month.
+
+    I've attached screenshots of the historian charts and the tag configuration
+    for one of the affected tags.
+
+    Yuki Tanaka
+    Automation Systems Engineer, Precision Automotive Systems
+
+  attachments:
+    - le-s06/historian_impossible_values.png
+    - le-s06/tag_config_int32.png
+
+diagnostic_checklist:
+  - "What pattern do the corrupt values follow? (2,147,483,647 is INT32_MAX — does that suggest anything?)"
+  - "The issue started immediately after the 4.0.6 update and only affects int32 tags — is this a config issue or a platform issue?"
+  - "Can this be fixed by reconfiguring the tags, or does the data type handling need to be fixed in the platform?"
+
+root_cause: |
+  This is an integer overflow bug introduced in Litmus Edge 4.0.6 affecting the
+  int32 data type handler for certain register read operations. The value
+  2,147,483,647 is INT32_MAX, indicating a signed/unsigned integer handling
+  regression in the 4.0.6 update's data serialisation layer. The -847,293 PSI
+  reading indicates a signed integer underflow. This cannot be worked around
+  through tag reconfiguration. It requires a platform patch from Litmus engineering.
+  This is a confirmed regression bug. The customer cannot roll back easily and
+  the issue affects production data integrity.
+
+escalation_reason: |
+  This is a data type handling regression introduced in the 4.0.6 platform update.
+  L0 cannot fix integer overflow bugs in the platform. Engineering needs to:
+    1. Confirm the bug is known/reproducible
+    2. Provide a hotfix or patched 4.0.6 build
+    3. Advise on whether the historian data written during the affected period
+       needs to be corrected or flagged as unreliable
+
+grading_rubric: |
+  Evaluate the trainee's full response to this ticket.
+
+  CRITICAL (50 pts): Did the trainee apply the 'escalate' tag?
+    This is binary: YES = full 50 pts, NO = 0 pts for this section and
+    an automatic cap of 50/100 for the overall score.
+
+  IMPORTANT (25 pts): Does the escalation note provide engineering with what they need?
+    Required elements:
+      - LE version (4.0.6 — specifically that it started after update)
+      - That it only affects int32-type tags
+      - The specific impossible values observed (INT32_MAX, underflow)
+      - That hardware sensors are confirmed working independently
+      - Impact: production data integrity affected
+    Note: the trainee does NOT need to know it's an integer overflow bug — but they
+    should describe the symptoms accurately enough that engineering can diagnose it.
+
+  QUALITY (15 pts): Did the trainee communicate clearly with the customer?
+    Good escalation: acknowledges the severity, doesn't speculate on root cause,
+    doesn't promise a fix timeline, explains next steps (engineering review).
+
+  RESTRAINT (10 pts): Did the trainee avoid suggesting incorrect L0 "fixes"?
+    Common wrong answers: "change the tag data type to float64" (doesn't fix the
+    platform bug, corrupts historical data comparisons), "delete and recreate the
+    tags" (same issue), "roll back to 4.0.5" (customer said they can't).
+
+  DEDUCT 50 pts if the trainee did NOT escalate.
+  DEDUCT 25 pts if the trainee suggested "change data type to float64" or other
+    workarounds that would mask the bug rather than report it. This is dangerous
+    for data integrity and is a significant L0 failure.
+
+  Score range: 0–100. Passing threshold: 70.

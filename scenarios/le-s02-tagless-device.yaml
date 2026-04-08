@@ -1,0 +1,77 @@
+id: le-s02
+title: New device created but no data appearing in historian
+difficulty: beginner
+expected_action: resolve
+
+customer:
+  name: Priya Nair
+  company: SolarTech Manufacturing
+  le_version: "4.0.6"
+
+ticket:
+  subject: "Device showing as Running but zero data in historian"
+  initial_message: |
+    Hello,
+
+    Our controls engineer set up a new Modbus device in Litmus Edge yesterday
+    called "Inverter-Bay4". It shows as Running (green) in DeviceHub, and the
+    device itself is communicating fine. But after 24 hours, there is still zero
+    data appearing in our historian. No tag values at all.
+
+    We've checked the historian connection and it's working — other devices are
+    writing data to it normally. We also confirmed the Modbus RTU hardware is
+    responding to polls from the network.
+
+    I've attached screenshots of the device detail page and the historian query
+    result showing the empty dataset.
+
+    What are we missing?
+
+    Priya Nair
+    Operations Technology, SolarTech Manufacturing
+
+  attachments:
+    - le-s02/device_detail_running.png
+    - le-s02/historian_empty_result.png
+
+diagnostic_checklist:
+  - "Does the device detail page show any tags configured under it?"
+  - "A device can be Running but have no tags defined — would that explain the empty historian?"
+  - "What is the difference between a device being 'Running' and it actually publishing data?"
+
+root_cause: |
+  The device "Inverter-Bay4" has been created and started in DeviceHub, but no
+  tags have been configured on it. In Litmus Edge, a device being in Running state
+  only means the device connection is active — it does not publish any data unless
+  tags are explicitly defined to specify which registers/addresses to read and where
+  to send the values.
+  Resolution: the customer's engineer needs to add tags to the device in DeviceHub,
+  specifying register addresses, data types, polling intervals, and output destinations
+  (historian, MQTT, etc.).
+
+correct_response_summary: |
+  1. Identify that the device has no tags configured (visible in the device detail screenshot)
+  2. Explain the distinction: Running = connection active, but tags define what data is collected
+  3. Guide customer to: DeviceHub → select device → Tags tab → Add Tag
+  4. Advise them to specify register address, data type, polling interval, and output destination
+  5. Ask them to confirm data appears in historian after adding tags
+
+grading_rubric: |
+  Evaluate the trainee's full response to this ticket.
+
+  CRITICAL (50 pts): Did the trainee correctly identify that the device has no tags
+    configured as the root cause? Simply saying "check the tags" without explaining
+    WHY no tags means no data scores at most 30 pts here.
+
+  IMPORTANT (25 pts): Did the trainee explain the Running vs. data-publishing distinction
+    clearly? Did they provide guidance on how to add tags (DeviceHub → device → Tags tab)?
+
+  QUALITY (15 pts): Is the response professional and educational? The customer clearly
+    doesn't understand the tags concept — a good response teaches, not just instructs.
+
+  VERIFICATION (10 pts): Did they ask the customer to confirm data flows after adding tags?
+
+  DEDUCT 40 pts if the trainee escalated. No-tags is a configuration gap, not a bug.
+  DEDUCT 15 pts if they didn't explain the Running vs. no-data distinction.
+
+  Score range: 0–100. Passing threshold: 70.

@@ -1,0 +1,82 @@
+id: le-s03
+title: Remote SSH access to Litmus Edge is not working
+difficulty: intermediate
+expected_action: resolve
+
+customer:
+  name: Tomasz Wierzbicki
+  company: Baltic Logistics Group
+  le_version: "4.0.6"
+
+ticket:
+  subject: "Cannot SSH into Litmus Edge — connection refused"
+  initial_message: |
+    Hi,
+
+    Our field engineers need SSH access to our Litmus Edge appliance for
+    routine maintenance. Since this morning, all SSH connection attempts are
+    being refused with "Connection refused" on port 22.
+
+    The appliance is reachable on the network — we can access the Litmus Edge
+    web UI fine. VPN is up. We tried from two different engineer workstations
+    with the same result.
+
+    We haven't changed any SSH configuration on the appliance itself. Our
+    network firewall rules haven't changed. It was working last week.
+
+    I've attached screenshots from the terminal showing the refused connection,
+    and a screenshot of the Litmus Edge System Services page I found while
+    poking around the UI.
+
+    Can you help?
+
+    Tomasz Wierzbicki
+    IT Infrastructure, Baltic Logistics Group
+
+  attachments:
+    - le-s03/ssh_connection_refused.png
+    - le-s03/system_services_page.png
+
+diagnostic_checklist:
+  - "The web UI works but SSH doesn't — what does that tell you about the network vs. the service?"
+  - "The screenshot shows the System Services page — what is the status of the SSH service?"
+  - "If a service is stopped in Litmus Edge, can an admin restart it from the UI?"
+
+root_cause: |
+  The SSH service on the Litmus Edge appliance is stopped. Litmus Edge manages
+  SSH as a controllable system service (visible under System → Services or the
+  equivalent section in the UI). When stopped, port 22 refuses all connections
+  even though the appliance and its web UI remain fully operational.
+  Resolution: an admin user needs to navigate to the Services management section
+  in the Litmus Edge UI and start the SSH service. No network changes required.
+
+correct_response_summary: |
+  1. Identify from the screenshot that the SSH service shows as Stopped in the Services page
+  2. Explain that SSH is a managed service in Litmus Edge — it can be started/stopped via the UI
+  3. Guide customer: Litmus Edge UI → System → Services → SSH → click Start
+  4. Confirm the service shows as Running after starting
+  5. Ask customer to retry SSH connection and confirm success
+
+grading_rubric: |
+  Evaluate the trainee's full response to this ticket.
+
+  CRITICAL (50 pts): Did the trainee correctly identify that the SSH service is stopped
+    in the Litmus Edge Services page (visible in the provided screenshot)?
+    Answers that focus on network/firewall troubleshooting without reading the screenshot
+    score at most 20 pts — the screenshot makes the cause clear.
+
+  IMPORTANT (25 pts): Did the trainee provide the correct resolution path?
+    Required: System → Services → SSH → Start. Sending the customer on a firewall
+    investigation chase when the screenshot shows the service is stopped is wrong.
+
+  QUALITY (15 pts): Did the trainee acknowledge they identified the cause from the
+    screenshot? Good support analysts call out what evidence they used to diagnose.
+
+  VERIFICATION (10 pts): Did they ask the customer to retry SSH after starting the service?
+
+  DEDUCT 40 pts if the trainee escalated. Stopping/starting a service is L0 — it
+    requires no engineering involvement and is explicitly supported in the UI.
+  DEDUCT 25 pts if they recommended firewall investigation instead of addressing
+    the stopped service.
+
+  Score range: 0–100. Passing threshold: 70.

@@ -1,0 +1,77 @@
+id: le-s01
+title: Device stopped publishing data to MQTT
+difficulty: beginner
+expected_action: resolve
+
+customer:
+  name: Carlos Mendes
+  company: Riverside Utilities
+  le_version: "4.0.6"
+
+ticket:
+  subject: "PLC-Line3 stopped sending data — production impact"
+  initial_message: |
+    Hi support team,
+
+    We're seeing a critical issue in our production environment. One of our
+    OT devices, "PLC-Line3", stopped publishing data to our MQTT broker
+    approximately 90 minutes ago. Our monitoring dashboard shows no values
+    coming in from that device's tags since then.
+
+    This device monitors flow rates on our Line 3 water treatment process.
+    Operators have noticed the gap and flagged it to me.
+
+    Nothing was changed on the Litmus Edge configuration today as far as
+    I'm aware. The device hardware is fine — I can ping it from the network.
+    I've attached a screenshot of the DeviceHub overview and the tag data table.
+
+    Please advise urgently.
+
+    Carlos Mendes
+    OT Systems Lead, Riverside Utilities
+
+  attachments:
+    - le-s01/devicehub_overview.png
+    - le-s01/tag_data_gap.png
+
+diagnostic_checklist:
+  - "What state does DeviceHub show for the PLC-Line3 device? (Running / Stopped / Error)"
+  - "Do the attached screenshots show any error indicators or status badges?"
+  - "Could there be a scheduled maintenance window or a misconfigured auto-stop policy?"
+
+root_cause: |
+  The device "PLC-Line3" is in a Stopped state in Litmus Edge DeviceHub.
+  When a device is stopped, it ceases polling the connected hardware and publishing
+  tag values to MQTT. The underlying PLC hardware is functional — the issue is
+  entirely within Litmus Edge's device management layer.
+  Resolution: the customer needs to navigate to DeviceHub, find the device,
+  and click the Start (▶) button.
+
+correct_response_summary: |
+  1. Identify that the device is in Stopped state (visible in screenshot)
+  2. Guide customer to: Litmus Edge UI → DeviceHub → find "PLC-Line3" → click ▶ Start
+  3. Ask customer to confirm data resumes flowing (check tag values / MQTT broker)
+  4. If device does not start, ask for any error messages shown
+
+grading_rubric: |
+  Evaluate the trainee's full response to this ticket.
+
+  CRITICAL (50 pts): Did the trainee correctly identify that the device is in a
+    Stopped state as the root cause? Vague answers like "check the device" without
+    identifying the stopped state score at most 25 pts here.
+
+  IMPORTANT (25 pts): Did the trainee provide accurate, step-by-step instructions?
+    Required steps: Litmus Edge UI → DeviceHub → locate device → click Start.
+    Deduct points if steps are out of order, incomplete, or technically wrong.
+
+  QUALITY (15 pts): Is the response professional, clear, and appropriately urgent
+    given the customer's production context? Did they acknowledge the impact?
+
+  VERIFICATION (10 pts): Did they ask the customer to confirm that data resumed
+    after starting the device?
+
+  DEDUCT 40 pts if the trainee applied the 'escalate' tag. This is a straightforward
+    L0 issue — escalating it is incorrect and wastes engineering time.
+  DEDUCT 20 pts if their remediation steps are technically inaccurate.
+
+  Score range: 0–100. Passing threshold: 70.
