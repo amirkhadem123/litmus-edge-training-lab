@@ -23,9 +23,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import (
+    add_answered_topic,
     add_comment,
     create_ticket,
     get_all_tickets,
+    get_answered_topics,
     get_comments,
     get_ticket,
     init_db,
@@ -91,19 +93,44 @@ def load_all_scenarios() -> list[dict]:
 
 # ── Reply matching ────────────────────────────────────────────────────────────
 
-def match_reply(comment_body: str, scenario: dict) -> str | None:
+def match_reply(
+    comment_body: str,
+    scenario: dict,
+    answered_topics: list[str],
+) -> tuple[str | None, list[str]]:
     """
-    Find the first scripted reply whose triggers appear in the comment body.
-    Falls back to the scenario's fallback_reply if no trigger matches.
-    Returns None if neither is available.
+    Match all triggered topics in the comment (Option A: multi-match).
+    For each match, use repeat_reply if the topic was already answered (Option B).
+
+    Returns:
+        (combined_reply, newly_answered_topics)
+        combined_reply is None if nothing matched (not even a fallback).
     """
     body_lower = comment_body.lower()
+    matched_parts: list[str] = []
+    newly_answered: list[str] = []
+
     for entry in scenario.get("scripted_replies", []):
         triggers = entry.get("triggers", [])
-        if any(trigger.lower() in body_lower for trigger in triggers):
-            return entry["reply"].strip()
+        if not any(trigger.lower() in body_lower for trigger in triggers):
+            continue
+
+        topic = entry.get("topic")
+        if topic and topic in answered_topics:
+            # Already covered — use the shorter repeat reply if provided
+            repeat = entry.get("repeat_reply", "").strip()
+            if repeat:
+                matched_parts.append(repeat)
+        else:
+            matched_parts.append(entry["reply"].strip())
+            if topic:
+                newly_answered.append(topic)
+
+    if matched_parts:
+        return "\n\n".join(matched_parts), newly_answered
+
     fallback = scenario.get("fallback_reply", "").strip()
-    return fallback or None
+    return (fallback or None), []
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -185,9 +212,12 @@ async def reply(
     set_escalated(ticket_id, is_escalated)
 
     if scenario:
-        customer_reply = match_reply(body, scenario)
+        answered_topics = get_answered_topics(ticket_id)
+        customer_reply, newly_answered = match_reply(body, scenario, answered_topics)
         if customer_reply:
             add_comment(ticket_id, customer_reply, "customer")
+        for topic in newly_answered:
+            add_answered_topic(ticket_id, topic)
 
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
 

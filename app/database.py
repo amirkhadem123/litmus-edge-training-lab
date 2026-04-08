@@ -9,6 +9,7 @@ All functions use a context manager so connections are always closed promptly.
 The DB file (litmus_lab.db) lives in the project root and is gitignored.
 """
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -27,14 +28,15 @@ def init_db() -> None:
     with _connect() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS tickets (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                scenario_id TEXT    NOT NULL,
-                trainee     TEXT    NOT NULL,
-                status      TEXT    NOT NULL DEFAULT 'open',
-                escalated   INTEGER NOT NULL DEFAULT 0,
-                score       INTEGER,                          -- NULL until graded
-                created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                solved_at   TIMESTAMP
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                scenario_id      TEXT    NOT NULL,
+                trainee          TEXT    NOT NULL,
+                status           TEXT    NOT NULL DEFAULT 'open',
+                escalated        INTEGER NOT NULL DEFAULT 0,
+                score            INTEGER,                     -- NULL until graded
+                answered_topics  TEXT    NOT NULL DEFAULT '[]', -- JSON array of topic strings
+                created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                solved_at        TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS comments (
@@ -85,6 +87,27 @@ def set_escalated(ticket_id: int, value: bool) -> None:
             "UPDATE tickets SET escalated = ? WHERE id = ?",
             (int(value), ticket_id),
         )
+
+
+def get_answered_topics(ticket_id: int) -> list[str]:
+    """Return the list of topic IDs already answered for this ticket."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT answered_topics FROM tickets WHERE id = ?", (ticket_id,)
+        ).fetchone()
+        return json.loads(row["answered_topics"]) if row else []
+
+
+def add_answered_topic(ticket_id: int, topic: str) -> None:
+    """Append a topic ID to the answered list (no-op if already present)."""
+    topics = get_answered_topics(ticket_id)
+    if topic not in topics:
+        topics.append(topic)
+        with _connect() as conn:
+            conn.execute(
+                "UPDATE tickets SET answered_topics = ? WHERE id = ?",
+                (json.dumps(topics), ticket_id),
+            )
 
 
 def solve_ticket(ticket_id: int, score: int | None = None) -> None:
