@@ -101,8 +101,8 @@ litmus-lab/
 
 - **Python 3.12+** (for local dev)
 - **Docker + Docker Compose** (for production deployment)
-- **An OpenAI-compatible API endpoint** — the company's internal AI API, or any
-  provider (OpenAI, Azure OpenAI, Anthropic, local LM Studio, etc.)
+- **An OpenAI-compatible API endpoint** — the company's internal AI API, OpenAI
+  direct, Azure OpenAI, or a local server like LM Studio
 - **Screenshots** for each scenario — see `scenarios/screenshots/README.md`
 
 ---
@@ -135,6 +135,9 @@ LITMUS_GRADE_MODEL=gpt-4o-mini
 The app uses the same endpoint for both AI customer simulation and grading.
 Any OpenAI-compatible API works: company internal, OpenAI direct, Azure OpenAI,
 or a local server like LM Studio (`LITMUS_API_BASE=http://localhost:1234/v1`).
+
+SSL certificate verification is disabled by default — required for internal
+company endpoints that use self-signed or private CA certificates.
 
 ### 3. Start the server
 

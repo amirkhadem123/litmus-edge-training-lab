@@ -1,11 +1,11 @@
 """
 grader.py — LLM-agnostic grading for trainee responses.
 
-Uses LiteLLM as the provider layer, routing to the company's internal
-OpenAI-compatible API configured via environment variables.
+Routes to the company's internal OpenAI-compatible API configured via
+environment variables.
 
 Required env vars:
-    LITMUS_API_BASE  — base URL of the internal API (e.g. https://ai.company.com/v1)
+    LITMUS_API_BASE  — base URL of the internal API (e.g. https://ai.company.com/api)
     LITMUS_API_KEY   — API key for the internal endpoint
 
 Optional:
@@ -16,9 +16,11 @@ import json
 import os
 from dataclasses import dataclass
 
-import litellm
+import httpx
+from openai import OpenAI
 
-litellm.suppress_debug_info = True
+PASS_THRESHOLD = 70
+DEFAULT_GRADE_MODEL = "gpt-4o-mini"
 
 
 @dataclass
@@ -28,10 +30,6 @@ class GradeResult:
     action_correct: bool
     feedback: str
     key_issues: list[str]
-
-
-PASS_THRESHOLD = 70
-DEFAULT_GRADE_MODEL = "gpt-4o-mini"
 
 
 def _grade_model() -> str:
@@ -101,20 +99,20 @@ The score must reflect the rubric point deductions. Do not be lenient about crit
     api_base = os.environ.get("LITMUS_API_BASE")
     api_key = os.environ.get("LITMUS_API_KEY")
 
-    kwargs: dict = {
-        "model": _grade_model(),
-        "max_tokens": 1024,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_prompt},
-        ],
-    }
-    if api_base:
-        kwargs["api_base"] = api_base
-    if api_key:
-        kwargs["api_key"] = api_key
-
-    response = litellm.completion(**kwargs)
+    with httpx.Client(verify=False) as http_client:
+        client = OpenAI(
+            base_url=api_base,
+            api_key=api_key,
+            http_client=http_client,
+        )
+        response = client.chat.completions.create(
+            model=_grade_model(),
+            max_tokens=1024,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+        )
 
     raw = response.choices[0].message.content.strip()
 

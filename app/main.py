@@ -170,8 +170,9 @@ async def reply(
         try:
             customer_reply = await generate_customer_reply(scenario, conversation)
             add_comment(ticket_id, customer_reply, "customer")
-        except Exception:
-            pass  # silently skip customer reply on API error; ticket still usable
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("customer reply failed: %s: %s", type(exc).__name__, exc)
 
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
 

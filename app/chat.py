@@ -8,9 +8,8 @@ to what the scenario author says the customer knows and can reveal.
 
 import os
 
-import litellm
-
-litellm.suppress_debug_info = True
+import httpx
+from openai import AsyncOpenAI
 
 _DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 
@@ -93,12 +92,17 @@ async def generate_customer_reply(
         role = "user" if author == "trainee" else "assistant"
         messages.append({"role": role, "content": body})
 
-    response = await litellm.acompletion(
-        model=model,
-        api_base=api_base,
-        api_key=api_key,
-        messages=messages,
-        max_tokens=300,
-        temperature=0.7,
-    )
+    # Use the OpenAI SDK directly with SSL verification disabled.
+    # This is required for internal company endpoints with self-signed certs.
+    async with httpx.AsyncClient(verify=False) as http_client:
+        client = AsyncOpenAI(
+            base_url=api_base,
+            api_key=api_key,
+            http_client=http_client,
+        )
+        response = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=300,
+        )
     return response.choices[0].message.content.strip()

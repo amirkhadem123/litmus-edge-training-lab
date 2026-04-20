@@ -6,9 +6,13 @@ python-dotenv==1.0.1
 # PyYAML — parses scenario YAML files
 PyYAML>=6.0
 
-# litellm — unified interface for LLM providers; handles OpenAI-compatible APIs
-# as well as Anthropic, Gemini, Azure, and 100+ others.
-litellm>=1.40.0
+# openai — OpenAI SDK, used for all AI calls (chat simulation + grading)
+# Works with any OpenAI-compatible endpoint via base_url parameter
+openai>=1.30.0
+
+# httpx — async HTTP client; passed to the OpenAI SDK with verify=False
+# to support internal company endpoints with self-signed certificates
+httpx>=0.27.0
 
 # FastAPI + Uvicorn — web framework and ASGI server
 fastapi>=0.111.0
