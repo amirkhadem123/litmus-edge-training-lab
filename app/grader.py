@@ -1,18 +1,15 @@
 """
 grader.py — LLM-agnostic grading for trainee responses.
 
-Uses LiteLLM as the provider layer, which supports OpenAI, Anthropic, Google
-Gemini, Azure, Mistral, and many others through a unified interface.
+Uses LiteLLM as the provider layer, routing to the company's internal
+OpenAI-compatible API configured via environment variables.
 
-Configure via .env:
-    LITMUS_MODEL=claude-haiku-4-5-20251001   # default
-    LITMUS_MODEL=gpt-4o-mini
-    LITMUS_MODEL=gemini/gemini-1.5-flash
+Required env vars:
+    LITMUS_API_BASE  — base URL of the internal API (e.g. https://ai.company.com/v1)
+    LITMUS_API_KEY   — API key for the internal endpoint
 
-Set the matching API key for your chosen provider:
-    ANTHROPIC_API_KEY   → any claude-* model
-    OPENAI_API_KEY      → any gpt-* model
-    GEMINI_API_KEY      → any gemini/* model
+Optional:
+    LITMUS_GRADE_MODEL — model name for grading (default: gpt-4o-mini)
 """
 
 import json
@@ -21,28 +18,27 @@ from dataclasses import dataclass
 
 import litellm
 
-# Suppress LiteLLM's verbose startup banner
 litellm.suppress_debug_info = True
 
 
 @dataclass
 class GradeResult:
-    score: int              # 0–100
-    passed: bool            # score >= PASS_THRESHOLD
-    action_correct: bool    # did trainee choose resolve vs. escalate correctly?
-    feedback: str           # 2–3 paragraph written feedback for the trainee
-    key_issues: list[str]   # specific strengths / gaps (bullet points)
+    score: int
+    passed: bool
+    action_correct: bool
+    feedback: str
+    key_issues: list[str]
 
 
 PASS_THRESHOLD = 70
-
-# Default model — override with LITMUS_MODEL env var.
-# Examples: "gpt-4o-mini", "gemini/gemini-1.5-flash", "claude-haiku-4-5-20251001"
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_GRADE_MODEL = "gpt-4o-mini"
 
 
-def _active_model() -> str:
-    return os.environ.get("LITMUS_MODEL", DEFAULT_MODEL)
+def _grade_model() -> str:
+    return os.environ.get(
+        "LITMUS_GRADE_MODEL",
+        os.environ.get("LITMUS_MODEL", DEFAULT_GRADE_MODEL),
+    )
 
 
 def grade_response(scenario: dict, ticket_thread: list[dict], escalated: bool) -> GradeResult:
@@ -51,13 +47,13 @@ def grade_response(scenario: dict, ticket_thread: list[dict], escalated: bool) -
 
     Args:
         scenario:      Parsed scenario YAML dict.
-        ticket_thread: List of comment dicts (in chronological order).
+        ticket_thread: List of comment dicts (chronological, public only).
         escalated:     True if the trainee checked the escalation box.
 
     Returns:
         GradeResult with score, feedback, and key issues.
     """
-    expected_action = scenario["expected_action"]  # "resolve" or "escalate"
+    expected_action = scenario["expected_action"]
     action_correct = (
         (expected_action == "escalate" and escalated)
         or (expected_action == "resolve" and not escalated)
@@ -102,18 +98,26 @@ Return a JSON object with exactly these fields:
 
 The score must reflect the rubric point deductions. Do not be lenient about critical failures."""
 
-    response = litellm.completion(
-        model=_active_model(),
-        max_tokens=1024,
-        messages=[
+    api_base = os.environ.get("LITMUS_API_BASE")
+    api_key = os.environ.get("LITMUS_API_KEY")
+
+    kwargs: dict = {
+        "model": _grade_model(),
+        "max_tokens": 1024,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-    )
+    }
+    if api_base:
+        kwargs["api_base"] = api_base
+    if api_key:
+        kwargs["api_key"] = api_key
+
+    response = litellm.completion(**kwargs)
 
     raw = response.choices[0].message.content.strip()
 
-    # Some models wrap JSON in a code fence despite instructions — strip it
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -144,7 +148,7 @@ def format_internal_note(grade: GradeResult, scenario: dict, trainee_name: str) 
 Trainee:         {trainee_name}
 Scenario:        {scenario['id']} — {scenario['title']}
 Expected action: {expected}
-Model:           {_active_model()}
+Model:           {_grade_model()}
 
 Score:           {grade.score}/100  {status_icon} {'PASSED' if grade.passed else 'FAILED'}
 Correct action:  {action_icon} {'Yes' if grade.action_correct else 'No — wrong resolve/escalate decision'}
@@ -160,7 +164,7 @@ TRAINER FEEDBACK:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _format_thread(comments: list[dict]) -> str:
-    """Convert the local comment list into a readable transcript for the LLM."""
+    """Convert the comment list into a readable transcript for the LLM."""
     author_labels = {
         "customer": "CUSTOMER",
         "trainee":  "TRAINEE",

@@ -6,20 +6,22 @@ Schema:
   comments — the full conversation thread for each ticket
 
 All functions use a context manager so connections are always closed promptly.
-The DB file (litmus_lab.db) lives in the project root and is gitignored.
+WAL mode is enabled for safe concurrent access (multiple simultaneous users).
+The DB path defaults to the project root but can be overridden with LITMUS_DATA_DIR.
 """
 
-import json
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path("litmus_lab.db")
+DB_PATH = Path(os.environ.get("LITMUS_DATA_DIR", ".")) / "litmus_lab.db"
 
 
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row   # lets us access columns by name
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
 
@@ -28,23 +30,22 @@ def init_db() -> None:
     with _connect() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS tickets (
-                id               INTEGER PRIMARY KEY AUTOINCREMENT,
-                scenario_id      TEXT    NOT NULL,
-                trainee          TEXT    NOT NULL,
-                status           TEXT    NOT NULL DEFAULT 'open',
-                escalated        INTEGER NOT NULL DEFAULT 0,
-                score            INTEGER,                     -- NULL until graded
-                answered_topics  TEXT    NOT NULL DEFAULT '[]', -- JSON array of topic strings
-                created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                solved_at        TIMESTAMP
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                scenario_id TEXT    NOT NULL,
+                trainee     TEXT    NOT NULL,
+                status      TEXT    NOT NULL DEFAULT 'open',
+                escalated   INTEGER NOT NULL DEFAULT 0,
+                score       INTEGER,
+                created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                solved_at   TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS comments (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticket_id   INTEGER NOT NULL REFERENCES tickets(id),
                 body        TEXT    NOT NULL,
-                author_type TEXT    NOT NULL,   -- 'customer' | 'trainee' | 'system'
-                is_internal INTEGER NOT NULL DEFAULT 0,  -- 1 = internal note (grade)
+                author_type TEXT    NOT NULL,
+                is_internal INTEGER NOT NULL DEFAULT 0,
                 created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
         """)
@@ -87,27 +88,6 @@ def set_escalated(ticket_id: int, value: bool) -> None:
             "UPDATE tickets SET escalated = ? WHERE id = ?",
             (int(value), ticket_id),
         )
-
-
-def get_answered_topics(ticket_id: int) -> list[str]:
-    """Return the list of topic IDs already answered for this ticket."""
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT answered_topics FROM tickets WHERE id = ?", (ticket_id,)
-        ).fetchone()
-        return json.loads(row["answered_topics"]) if row else []
-
-
-def add_answered_topic(ticket_id: int, topic: str) -> None:
-    """Append a topic ID to the answered list (no-op if already present)."""
-    topics = get_answered_topics(ticket_id)
-    if topic not in topics:
-        topics.append(topic)
-        with _connect() as conn:
-            conn.execute(
-                "UPDATE tickets SET answered_topics = ? WHERE id = ?",
-                (json.dumps(topics), ticket_id),
-            )
 
 
 def solve_ticket(ticket_id: int, score: int | None = None) -> None:

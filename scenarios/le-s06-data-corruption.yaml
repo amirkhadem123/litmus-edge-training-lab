@@ -93,45 +93,30 @@ grading_rubric: |
 
   Score range: 0–100. Passing threshold: 70.
 
-scripted_replies:
-  - triggers: ["sensor", "hardware", "instrument", "physical", "real", "actual", "verify", "check hardware"]
-    reply: |
-      Yes, confirmed independently. We put a calibrated handheld meter on
-      the same measurement points as the Litmus Edge sensors:
-      - Tank pressure: 87 PSI (Litmus Edge shows -847,293 PSI)
-      - Furnace temp: 1,203°C (Litmus Edge shows 2,147,483,647°C)
-      The hardware is absolutely fine. This is a Litmus Edge data issue.
-
-  - triggers: ["tag", "data type", "int", "float", "int32", "float64", "type", "format"]
-    reply: |
-      Interesting — I just cross-referenced. All four affected tags are
-      configured as int32 data type. I have three other tags on the same
-      devices using float64, and those are reading correctly right now.
-      Is the int32 type causing this?
-
-  - triggers: ["update", "version", "upgrade", "4.0.6", "when", "started", "since"]
-    reply: |
-      The update to 4.0.6 was applied during our maintenance window last
-      night starting at 02:15. The process completed at 02:47 with no
-      errors reported by the updater. The first shift operator noticed
-      the bad readings at 06:10 this morning when they started their rounds.
-
-  - triggers: ["rollback", "downgrade", "4.0.5", "revert", "previous version"]
-    reply: |
-      A rollback isn't feasible for us. Our maintenance windows are monthly
-      and strictly controlled — we can't schedule one before next month.
-      We also need the 4.0.6 security patches to stay in compliance. We
-      need a solution that works on 4.0.6.
-
-  - triggers: ["other device", "other tag", "float", "working", "not affected", "which tags"]
-    reply: |
-      Let me check... The affected tags are: TankPressure_PSI (int32),
-      FurnaceTemp_C (int32), CoolantFlow_LPM (int32), LineSpeed_RPM (int32).
-      Working fine: CoolantTemp_C (float64), AmbientTemp_C (float64),
-      PowerDraw_KW (float64). Pattern is clear — every int32 tag is broken,
-      every float64 tag is fine.
-
-fallback_reply: |
-  This is affecting production data quality and our quality records for
-  this shift may be compromised. Tell me exactly what you need and I'll
-  pull it immediately.
+# ── AI customer simulation context ───────────────────────────────────────────
+customer_ai_context:
+  knows: |
+    - The update to Litmus Edge 4.0.6 was applied last night — maintenance window 02:15–02:47, completed with no errors
+    - Since the first shift operator noticed it at 06:10 this morning, four int32 tags show impossible values:
+        TankPressure_PSI (int32): reads -847,293 PSI — actual verified value is 87 PSI
+        FurnaceTemp_C (int32): reads 2,147,483,647 °C — actual verified value is 1,203 °C
+        CoolantFlow_LPM (int32): alternates between 0 and maximum value every 2 seconds
+        LineSpeed_RPM (int32): shows corrupted readings
+    - Three float64 tags on the same devices read correctly: CoolantTemp_C, AmbientTemp_C, PowerDraw_KW
+    - Physical sensors were independently verified with calibrated handheld instruments — hardware is fine
+    - Rolling back to 4.0.5 is not feasible (monthly maintenance windows, compliance requirements for 4.0.6 security patches)
+    - The historian has been recording incorrect data since 06:10 — quality records for this shift may be compromised
+  does_not_know: |
+    - That this is an integer overflow / signed-unsigned handling regression in the 4.0.6 update
+    - That the value 2,147,483,647 is INT32_MAX (a classic integer overflow indicator)
+    - That this cannot be fixed by changing tag configurations or data types
+    - Whether the engineering team has a patch or a fix timeline
+  behavior: |
+    - You are an automation systems engineer — you are technically precise and provide exact details
+    - You have already done thorough diagnostics before filing the ticket (hardware verification, pattern analysis)
+    - Express serious concern about data integrity — your quality records are affected
+    - Provide exact values and timing when asked
+    - Be skeptical of workarounds that do not address the root cause — you care about data quality
+    - If suggested to "change the data type to float64", push back — that would mask the problem and corrupt historical comparisons
+    - If asked about other tags, confirm the clear pattern: every int32 tag is affected, every float64 tag is fine
+    - State your LE version (4.0.6) and that this started immediately after the update when relevant

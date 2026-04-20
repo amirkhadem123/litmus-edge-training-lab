@@ -9,7 +9,7 @@ Routes:
     GET  /new                       — create ticket form
     POST /tickets/new               — create ticket + redirect
     GET  /tickets/{id}              — ticket conversation view
-    POST /tickets/{id}/reply        — submit trainee reply → trigger customer reply
+    POST /tickets/{id}/reply        — submit trainee reply → trigger AI customer reply
     POST /tickets/{id}/solve        — grade and close ticket
 """
 
@@ -22,12 +22,11 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.chat import generate_customer_reply
 from app.database import (
-    add_answered_topic,
     add_comment,
     create_ticket,
     get_all_tickets,
-    get_answered_topics,
     get_comments,
     get_ticket,
     init_db,
@@ -40,9 +39,6 @@ load_dotenv()
 
 app = FastAPI(title="Litmus Lab")
 
-# Serve scenario screenshots as static files.
-# Paths in YAML are relative to scenarios/screenshots/, e.g. "le-s01/foo.png".
-# They are served at /screenshots/le-s01/foo.png.
 app.mount(
     "/screenshots",
     StaticFiles(directory="scenarios/screenshots"),
@@ -51,7 +47,6 @@ app.mount(
 
 # Render templates directly with Jinja2 (bypasses Starlette's Jinja2Templates
 # wrapper, which has a Python 3.14 incompatibility in its LRUCache).
-# cache_size=0 disables template caching — fine for a local training tool.
 _jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader("app/templates"),
     cache_size=0,
@@ -59,7 +54,6 @@ _jinja_env = jinja2.Environment(
 
 
 def _render(template_name: str, **context) -> HTMLResponse:
-    """Render a Jinja2 template and return an HTMLResponse."""
     template = _jinja_env.get_template(template_name)
     return HTMLResponse(template.render(**context))
 
@@ -75,7 +69,6 @@ def on_startup() -> None:
 # ── Scenario helpers ──────────────────────────────────────────────────────────
 
 def load_scenario(scenario_id: str) -> dict | None:
-    """Load a single scenario YAML by ID (e.g. 'le-s01')."""
     for path in SCENARIOS_DIR.glob(f"{scenario_id}-*.yaml"):
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f)
@@ -83,7 +76,6 @@ def load_scenario(scenario_id: str) -> dict | None:
 
 
 def load_all_scenarios() -> list[dict]:
-    """Load all scenario YAMLs, sorted by filename."""
     scenarios = []
     for path in sorted(SCENARIOS_DIR.glob("le-s*.yaml")):
         with open(path, encoding="utf-8") as f:
@@ -91,53 +83,17 @@ def load_all_scenarios() -> list[dict]:
     return scenarios
 
 
-# ── Reply matching ────────────────────────────────────────────────────────────
+# ── Cloudflare identity ───────────────────────────────────────────────────────
 
-def match_reply(
-    comment_body: str,
-    scenario: dict,
-    answered_topics: list[str],
-) -> tuple[str | None, list[str]]:
-    """
-    Match all triggered topics in the comment (Option A: multi-match).
-    For each match, use repeat_reply if the topic was already answered (Option B).
-
-    Returns:
-        (combined_reply, newly_answered_topics)
-        combined_reply is None if nothing matched (not even a fallback).
-    """
-    body_lower = comment_body.lower()
-    matched_parts: list[str] = []
-    newly_answered: list[str] = []
-
-    for entry in scenario.get("scripted_replies", []):
-        triggers = entry.get("triggers", [])
-        if not any(trigger.lower() in body_lower for trigger in triggers):
-            continue
-
-        topic = entry.get("topic")
-        if topic and topic in answered_topics:
-            # Already covered — use the shorter repeat reply if provided
-            repeat = entry.get("repeat_reply", "").strip()
-            if repeat:
-                matched_parts.append(repeat)
-        else:
-            matched_parts.append(entry["reply"].strip())
-            if topic:
-                newly_answered.append(topic)
-
-    if matched_parts:
-        return "\n\n".join(matched_parts), newly_answered
-
-    fallback = scenario.get("fallback_reply", "").strip()
-    return (fallback or None), []
+def _cf_email(request: Request) -> str | None:
+    """Extract the authenticated user email injected by Cloudflare Access."""
+    return request.headers.get("Cf-Access-Authenticated-User-Email")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def queue(request: Request) -> HTMLResponse:
-    """Ticket queue — shows all tickets with status and score."""
     tickets = get_all_tickets()
     for ticket in tickets:
         scenario = load_scenario(ticket["scenario_id"])
@@ -147,22 +103,24 @@ async def queue(request: Request) -> HTMLResponse:
 
 @app.get("/new", response_class=HTMLResponse)
 async def new_ticket_form(request: Request) -> HTMLResponse:
-    """Create ticket form — trainer selects scenario and enters trainee name."""
     scenarios = load_all_scenarios()
-    return _render("new_ticket.html", scenarios=scenarios)
+    return _render("new_ticket.html", scenarios=scenarios, cf_email=_cf_email(request))
 
 
 @app.post("/tickets/new")
 async def create_ticket_route(
+    request: Request,
     scenario_id: str = Form(...),
     trainee: str = Form(...),
 ) -> RedirectResponse:
-    """Create a new ticket and post the customer's opening message."""
     scenario = load_scenario(scenario_id)
     if not scenario:
         return RedirectResponse("/new", status_code=303)
 
-    ticket_id = create_ticket(scenario_id, trainee.strip())
+    # Fall back to the Cloudflare identity if the form field was left blank.
+    trainee_name = trainee.strip() or _cf_email(request) or trainee.strip()
+
+    ticket_id = create_ticket(scenario_id, trainee_name)
     initial_body = scenario["ticket"]["initial_message"].strip()
     add_comment(ticket_id, initial_body, "customer")
 
@@ -171,7 +129,6 @@ async def create_ticket_route(
 
 @app.get("/tickets/{ticket_id}", response_class=HTMLResponse)
 async def view_ticket(request: Request, ticket_id: int) -> HTMLResponse:
-    """Ticket conversation view."""
     ticket = get_ticket(ticket_id)
     if not ticket:
         return RedirectResponse("/", status_code=303)
@@ -197,10 +154,7 @@ async def reply(
     body: str = Form(...),
     escalated: str | None = Form(None),
 ) -> RedirectResponse:
-    """
-    Save the trainee's comment, update the escalation flag, and immediately
-    post a customer reply if any scripted trigger matches.
-    """
+    """Save the trainee's reply and generate an AI customer response."""
     ticket = get_ticket(ticket_id)
     if not ticket or ticket["status"] == "solved":
         return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
@@ -212,12 +166,12 @@ async def reply(
     set_escalated(ticket_id, is_escalated)
 
     if scenario:
-        answered_topics = get_answered_topics(ticket_id)
-        customer_reply, newly_answered = match_reply(body, scenario, answered_topics)
-        if customer_reply:
+        conversation = get_comments(ticket_id)
+        try:
+            customer_reply = await generate_customer_reply(scenario, conversation)
             add_comment(ticket_id, customer_reply, "customer")
-        for topic in newly_answered:
-            add_answered_topic(ticket_id, topic)
+        except Exception:
+            pass  # silently skip customer reply on API error; ticket still usable
 
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
 
@@ -228,10 +182,7 @@ async def solve(
     body: str = Form(""),
     escalated: str | None = Form(None),
 ) -> RedirectResponse:
-    """
-    Optionally post a final trainee comment, then grade the ticket immediately
-    using Claude and post the result as an internal note.
-    """
+    """Post optional final reply, grade the ticket, and mark it solved."""
     ticket = get_ticket(ticket_id)
     if not ticket or ticket["status"] == "solved":
         return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
@@ -244,22 +195,17 @@ async def solve(
 
     set_escalated(ticket_id, is_escalated)
 
-    # Grade before closing so we can store the score on the ticket
     public_comments = [c for c in get_comments(ticket_id) if not c["is_internal"]]
     try:
         grade = grade_response(scenario, public_comments, is_escalated)
         solve_ticket(ticket_id, score=grade.score)
         note_body = format_internal_note(grade, scenario, ticket["trainee"])
     except Exception as exc:
-        # LLM call failed (missing API key, network error, bad JSON, etc.)
-        # Still mark the ticket solved so the trainee isn't stuck,
-        # but post the error as the internal note so it's visible.
         solve_ticket(ticket_id, score=None)
         note_body = (
             f"GRADING FAILED — ticket marked solved without a score.\n\n"
             f"Error: {type(exc).__name__}: {exc}\n\n"
-            f"Check that LITMUS_MODEL and the matching API key are set in .env, "
-            f"then re-run the server."
+            f"Check that LITMUS_API_BASE and LITMUS_API_KEY are set in .env."
         )
 
     add_comment(ticket_id, note_body, "system", is_internal=True)
