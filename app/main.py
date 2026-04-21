@@ -77,7 +77,7 @@ def load_scenario(scenario_id: str) -> dict | None:
 
 def load_all_scenarios() -> list[dict]:
     scenarios = []
-    for path in sorted(SCENARIOS_DIR.glob("le-s*.yaml")):
+    for path in sorted(SCENARIOS_DIR.glob("*.yaml")):
         with open(path, encoding="utf-8") as f:
             scenarios.append(yaml.safe_load(f))
     return scenarios

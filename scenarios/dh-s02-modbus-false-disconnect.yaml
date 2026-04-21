@@ -1,0 +1,126 @@
+id: dh-s02
+title: Modbus device shows Disconnected but tag data is still flowing
+difficulty: beginner
+expected_action: resolve
+
+customer:
+  name: Diane Okafor
+  company: Gulf Manufacturing Solutions
+  le_version: "4.0.6"
+
+ticket:
+  subject: "Modbus device showing Disconnected — is the hardware broken?"
+  initial_message: |
+    Hello,
+
+    I need help urgently. We have a Modbus device in Litmus Edge (our compressor unit,
+    "Compressor-A1") and it's been showing a red "Disconnected" status almost constantly
+    for the past two days. Occasionally it flickers to Connected for a second and then
+    goes red again.
+
+    I'm not a network person, but I'm worried our hardware is broken. We just upgraded
+    Litmus Edge recently and the problem started right after.
+
+    Can someone please look at this? This compressor monitors critical pressure and
+    temperature for our production line.
+
+    Diane Okafor
+    OT Supervisor
+    Gulf Manufacturing Solutions
+
+  attachments: []
+
+diagnostic_checklist:
+  - "Reassure the customer and ask them to check if any tags are still showing live data values (not just the connection badge)"
+  - "Ask the customer to check the device log in DeviceHub for any error messages"
+  - "Identify when exactly the issue started — confirm whether it was after the LE upgrade"
+  - "Ask what the Modbus device address/register configuration looks like — specifically the 'status register' or health probe setting"
+  - "Guide the customer to update the status register address to point to a valid register on the device"
+
+root_cause: |
+  Litmus Edge uses a background health probe to determine the Connected/Disconnected UI status
+  for Modbus devices. This probe polls a configurable "status register" address on the device.
+  If the poll succeeds, the device shows Connected; if it fails, the device shows Disconnected.
+
+  The default status register address (register 0 or address 0) doesn't exist on this customer's
+  compressor unit. When Litmus Edge polls that address, the Modbus device returns an
+  "illegal data address" exception (Modbus exception code 2). Litmus Edge interprets this
+  as a connection failure and marks the device Disconnected.
+
+  Critically, this status probe is completely separate from tag polling. The customer's actual
+  tags (temperature, pressure) are polling valid registers and returning real data — the data
+  IS flowing even though the UI shows Disconnected.
+
+  This started after the LE upgrade because the upgrade reset or changed the default status
+  register configuration.
+
+  Fix: in the DeviceHub device settings, change the status register (health probe) address
+  to point to a register that actually exists on the compressor (e.g., register 1 or whichever
+  coil/register is valid). Once updated, the probe will succeed and the device will show Connected.
+
+correct_response_summary: |
+  1. First confirm that tag data IS actually flowing despite the Disconnected badge — ask the
+     customer to check if temperature and pressure values are updating
+  2. Check the device log for "illegal data address" / Modbus exception 2 errors on the health probe
+  3. Explain that the Connected/Disconnected badge comes from a separate health probe, not from
+     tag polling — the data is fine, this is a UI status issue
+  4. Navigate to the device settings in DeviceHub and locate the "status register" or health probe
+     address field
+  5. Change the address to a register that exists on the compressor (e.g., register 1, or the
+     first coil address) — confirm with the customer what registers their device supports
+  6. Save the settings and verify the device now shows Connected consistently
+
+grading_rubric: |
+  CRITICAL (50 pts): Did the trainee identify that the Disconnected status is caused by a
+  health probe polling an invalid Modbus register address, and that actual tag data is
+  unaffected? Award full points if they correctly distinguish between the health probe
+  mechanism and tag polling. Award 0 pts if they conclude the hardware is broken, recommend
+  replacing the device, or focus only on network/hardware diagnostics without identifying
+  the status register configuration issue.
+
+  DIAGNOSTIC QUALITY (25 pts): Did the trainee first check whether tag data is actually
+  flowing (verifying data is OK despite the badge)? Did they look at device logs for
+  the "illegal data address" error? Award full points for both. Award 15 pts if they
+  checked logs but didn't first confirm data flow. Award 10 pts if they skipped log
+  investigation and jumped straight to the fix.
+
+  RESOLUTION STEPS (15 pts): Were the resolution steps accurate? Full points for: locate
+  status register setting → change to a valid register address → verify device shows
+  Connected. Deduct 5 pts if verification step was omitted. Deduct 10 pts if the
+  recommended fix is a device restart rather than changing the health probe address.
+
+  COMMUNICATION (10 pts): Was the trainee's response clear and reassuring for a non-technical
+  OT Supervisor? Did they avoid jargon or explain it when used? Did they acknowledge that
+  data IS flowing (reducing the customer's alarm) before diving into the fix?
+
+  CRITICAL PENALTY: If the trainee escalated this ticket, deduct 40 pts — this is a
+  straightforward L0-fixable configuration issue (wrong health probe register address).
+
+# ── AI customer simulation context ──────────────────────────────────────────
+customer_ai_context:
+  knows: |
+    - Compressor-A1 shows a red "Disconnected" badge in DeviceHub almost all the time
+    - The badge occasionally flickers to green "Connected" for a second, then goes red again
+    - The problem started right after a Litmus Edge upgrade two days ago — it was working fine before
+    - When asked to check tag values: temperature IS showing 87.3°C and pressure IS showing 4.2 bar — values are updating every few seconds
+    - The actual compressor hardware is physically running and online — no hardware alarms on the control panel
+    - The device log (if asked to look) shows repeated lines like:
+      "read register failed error=\"modbus: exception '2' (illegal data address), function '131'\""
+      These appear every 5–10 seconds.
+    - If asked to go to device settings: there is a "Status Register" field currently set to address 0
+    - The compressor's Modbus register map starts at register 1 (address 0 is not used on this device)
+    - After changing the Status Register to address 1 and saving: the device switches to green Connected
+  does_not_know: |
+    - What a "status register" or "health probe" is conceptually
+    - That Connected/Disconnected badge comes from a separate poll (not from the tag data poll)
+    - That tag data can be flowing even when the badge shows Disconnected
+    - Why address 0 doesn't work on their Modbus device
+    - That this is a configuration issue, not a hardware or network problem
+  behavior: |
+    - Non-technical OT Supervisor — doesn't know Modbus, PLC registers, or LE internals
+    - Initially alarmed and convinced the hardware is broken (the red badge is scary)
+    - Relieved and surprised when told the data IS actually flowing — this calms her down
+    - Will follow step-by-step instructions carefully when directed
+    - Will navigate to device settings when guided, can read out field names and current values
+    - Responds positively to reassurance — once told it's a configuration issue (not hardware), she's cooperative
+    - Keep responses concise: 2–3 sentences. Non-technical language only.

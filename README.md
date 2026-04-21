@@ -61,12 +61,8 @@ the scenario author. The LLM cannot invent facts that aren't in the scenario.
 litmus-lab/
 │
 ├── scenarios/                          ← Training scenario definitions (YAML)
-│   ├── le-s01-stopped-device.yaml
-│   ├── le-s02-tagless-device.yaml
-│   ├── le-s03-ssh-stopped.yaml
-│   ├── le-s04-viewer-permissions.yaml
-│   ├── le-s05-auth-service-crash.yaml  ← escalation scenario
-│   ├── le-s06-data-corruption.yaml     ← escalation scenario
+│   ├── dh-s01-opcua-bad-disconnected.yaml   ← DeviceHub: OPC UA Bad:Disconnected
+│   ├── dh-s02-modbus-false-disconnect.yaml  ← DeviceHub: Modbus false Disconnected
 │   └── screenshots/                    ← Pre-captured screenshots per scenario
 │       └── README.md
 │
@@ -286,19 +282,17 @@ TRAINER FEEDBACK:
 
 ## Scenario Reference
 
+### DeviceHub Scenarios
+
 | ID | Title | Action | Difficulty |
 |----|-------|--------|-----------|
-| `le-s01` | Device stopped publishing data to MQTT | Resolve | Beginner |
-| `le-s02` | New device created but no data in historian | Resolve | Beginner |
-| `le-s03` | Remote SSH access not working | Resolve | Intermediate |
-| `le-s04` | Engineer cannot modify device configuration | Resolve | Intermediate |
-| `le-s05` | All users randomly logged out (auth crash) | **Escalate** | Intermediate |
-| `le-s06` | Impossible sensor values after platform update | **Escalate** | Advanced |
+| `dh-s01` | OPC UA tags stuck at Bad:Disconnected despite device showing Connected | Resolve | Intermediate |
+| `dh-s02` | Modbus device shows Disconnected but tag data is still flowing | Resolve | Beginner |
 
-**Suggested training order:** le-s01 → le-s02 → le-s03 → le-s04 → le-s05 → le-s06
+**Suggested training order:** dh-s02 → dh-s01
 
-Run the resolve scenarios first so trainees build confidence before encountering
-the escalation scenarios.
+Start with dh-s02 (beginner) so trainees learn to distinguish UI status from actual data
+flow before tackling the more diagnostic dh-s01 (OPC UA subscription errors).
 
 ---
 
