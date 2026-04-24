@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}AI Settings — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+.settings-wrap {
+  max-width: 680px;
+}
+.settings-wrap h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2c2318;
+  margin-bottom: 0.3rem;
+}
+
+/* Provider cards */
+.provider-cards {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+}
+.provider-card {
+  flex: 1;
+  position: relative;
+  border: 2px solid #c8bfaf;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  background: #fdf8f0;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.provider-card:hover {
+  border-color: #9c6b2e;
+  background: #faf3e8;
+}
+.provider-card.selected {
+  border-color: #7a5230;
+  background: #f5ede0;
+}
+.provider-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.provider-card .card-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #9c8878;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  flex-shrink: 0;
+  background: transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+.provider-card.selected .card-dot {
+  border-color: #7a5230;
+  background: #7a5230;
+  box-shadow: inset 0 0 0 2px #f5ede0;
+}
+.card-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #2c2318;
+  display: flex;
+  align-items: center;
+}
+.card-desc {
+  font-size: 0.75rem;
+  color: #8a7e72;
+  margin-top: 0.25rem;
+}
+
+/* Form layout */
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+.form-row .form-group {
+  flex: 1;
+}
+input[type="password"] {
+  background: #fdf8f0;
+  border: 1px solid #c8bfaf;
+  border-radius: 6px;
+  color: #2c2318;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+input[type="password"]:focus {
+  outline: none;
+  border-color: #9c6b2e;
+  box-shadow: 0 0 0 2px rgba(156, 107, 46, 0.15);
+}
+input[readonly] {
+  background: #ede8df;
+  color: #6a5e52;
+  cursor: default;
+}
+
+.key-saved {
+  font-size: 0.75rem;
+  color: #3a8044;
+  font-weight: 600;
+  margin-left: 0.4rem;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+#test-result {
+  font-size: 0.875rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 7px;
+  margin-top: 0.75rem;
+  border-left: 4px solid;
+}
+#test-result.ok    { background: #ddf0e0; border-color: #3a8044; color: #1e4a28; }
+#test-result.error { background: #f8ddd8; border-color: #a83030; color: #6c1e1e; }
+{% endblock %}
+
+{% block content %}
+<div class="settings-wrap">
+  <h1>AI Provider Settings</h1>
+  <p class="text-muted" style="margin-bottom:1.5rem">
+    Configure which AI service powers customer simulation and ticket grading.
+    Settings are stored in the database and override environment variables.
+  </p>
+
+  {% if saved %}
+  <div class="alert alert-success" style="margin-bottom:1.25rem">Settings saved successfully.</div>
+  {% endif %}
+
+  <form method="POST" action="/settings" id="settings-form">
+
+    <!-- Provider selector -->
+    <div class="form-group">
+      <label>AI Provider</label>
+      <div class="provider-cards">
+
+        {% for key, preset in [
+          ("openwebui", {"label": "Open WebUI", "description": "Internal / custom OpenAI-compatible server"}),
+          ("claude",    {"label": "Anthropic Claude", "description": "claude-opus, claude-sonnet, claude-haiku"}),
+          ("gemini",    {"label": "Google Gemini", "description": "gemini-2.0-flash, gemini-1.5-pro, …"})
+        ] %}
+        <label class="provider-card {% if config.provider == key %}selected{% endif %}"
+               id="card-{{ key }}" for="radio-{{ key }}">
+          <input type="radio" name="provider" id="radio-{{ key }}"
+                 value="{{ key }}" {% if config.provider == key %}checked{% endif %}>
+          <div class="card-name"><span class="card-dot"></span>{{ preset.label }}</div>
+          <div class="card-desc">{{ preset.description }}</div>
+        </label>
+        {% endfor %}
+
+      </div>
+    </div>
+
+    <!-- API endpoint URL -->
+    <div class="form-group">
+      <label for="api_base">API Endpoint URL</label>
+      <input type="text" id="api_base" name="api_base"
+             value="{{ config.api_base }}"
+             placeholder="https://ai.internal.yourcompany.com/api"
+             {% if config.provider in ('claude', 'gemini') %}readonly{% endif %} />
+      <div class="text-muted mt-1" id="api_base_hint">
+        {% if config.provider == 'openwebui' %}Enter your Open WebUI server URL (the /api path).{% endif %}
+        {% if config.provider == 'claude' %}Anthropic's OpenAI-compatible endpoint — fixed.{% endif %}
+        {% if config.provider == 'gemini' %}Google's OpenAI-compatible endpoint — fixed.{% endif %}
+      </div>
+    </div>
+
+    <!-- API key -->
+    <div class="form-group">
+      <label for="api_key">
+        API Key
+        {% if has_key %}<span class="key-saved">✓ Key saved</span>{% endif %}
+      </label>
+      <input type="password" id="api_key" name="api_key"
+             placeholder="{{ 'Leave blank to keep existing key' if has_key else 'Paste your API key here' }}"
+             autocomplete="new-password" />
+    </div>
+
+    <!-- Models -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="chat_model">Chat Model <span class="text-muted">(customer simulation)</span></label>
+        <input type="text" id="chat_model" name="chat_model"
+               value="{{ config.chat_model }}" placeholder="e.g. gpt-4o-mini" />
+      </div>
+      <div class="form-group">
+        <label for="grade_model">Grade Model <span class="text-muted">(ticket grading)</span></label>
+        <input type="text" id="grade_model" name="grade_model"
+               value="{{ config.grade_model }}" placeholder="e.g. gpt-4o-mini" />
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button type="submit" class="btn btn-primary">Save Settings</button>
+      <button type="button" class="btn btn-ghost" id="test-btn">Test Connection</button>
+      <span id="test-spinner" style="display:none"><span class="spinner"></span> Testing…</span>
+    </div>
+
+  </form>
+
+  <div id="test-result" style="display:none"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PRESETS = {{ presets_json | safe }};
+
+// ── Provider card selection ───────────────────────────────────────────────────
+document.querySelectorAll('input[name="provider"]').forEach(radio => {
+  radio.addEventListener('change', () => applyPreset(radio.value));
+});
+
+function applyPreset(provider) {
+  const preset = PRESETS[provider];
+  if (!preset) return;
+
+  // Highlight selected card
+  document.querySelectorAll('.provider-card').forEach(card => {
+    card.classList.toggle('selected', card.id === 'card-' + provider);
+  });
+
+  // Update API base URL
+  const apiBaseInput = document.getElementById('api_base');
+  apiBaseInput.value = preset.api_base;
+  apiBaseInput.placeholder = preset.api_base_placeholder || '';
+  apiBaseInput.readOnly = !preset.api_base_editable;
+
+  // Update hint text
+  const hints = {
+    openwebui: 'Enter your Open WebUI server URL (the /api path).',
+    claude:    "Anthropic’s OpenAI-compatible endpoint — fixed.",
+    gemini:    "Google’s OpenAI-compatible endpoint — fixed.",
+  };
+  document.getElementById('api_base_hint').textContent = hints[provider] || '';
+
+  // Update model fields with defaults (only if unchanged from previous default)
+  document.getElementById('chat_model').value  = preset.chat_model;
+  document.getElementById('grade_model').value = preset.grade_model;
+}
+
+// ── Test connection ───────────────────────────────────────────────────────────
+document.getElementById('test-btn').addEventListener('click', async () => {
+  const btn     = document.getElementById('test-btn');
+  const spinner = document.getElementById('test-spinner');
+  const result  = document.getElementById('test-result');
+
+  btn.disabled = true;
+  spinner.style.display = 'inline';
+  result.style.display  = 'none';
+
+  try {
+    const res  = await fetch('/settings/test', { method: 'POST' });
+    const data = await res.json();
+    result.textContent    = data.message;
+    result.className      = data.ok ? 'ok' : 'error';
+    result.style.display  = 'block';
+  } catch (e) {
+    result.textContent   = 'Request failed: ' + e.message;
+    result.className     = 'error';
+    result.style.display = 'block';
+  } finally {
+    btn.disabled         = false;
+    spinner.style.display = 'none';
+  }
+});
+</script>
+{% endblock %}

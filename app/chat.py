@@ -6,12 +6,8 @@ customer_ai_context block. The AI plays the customer role, constrained
 to what the scenario author says the customer knows and can reveal.
 """
 
-import os
-
 import httpx
 from openai import AsyncOpenAI
-
-_DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 
 _GENERIC_FALLBACK = (
     "I appreciate your reply. Could you be more specific about what steps "
@@ -57,6 +53,11 @@ Keep replies concise — 2–4 sentences. You are not a Litmus Edge technical ex
 async def generate_customer_reply(
     scenario: dict,
     conversation_history: list[dict],
+    *,
+    api_base: str,
+    api_key: str,
+    model: str,
+    ssl_verify: bool = True,
 ) -> str:
     """
     Generate an AI customer reply based on the scenario and full conversation.
@@ -65,15 +66,14 @@ async def generate_customer_reply(
         scenario: Parsed scenario YAML dict (should contain customer_ai_context).
         conversation_history: Chronological list of comment dicts from get_comments(),
             including the initial customer message as the first entry.
+        api_base: OpenAI-compatible API base URL.
+        api_key: API key for the endpoint.
+        model: Model name to use.
+        ssl_verify: Set False for internal endpoints with self-signed certificates.
 
     Returns:
-        The AI-generated reply string.
-        Returns a generic fallback if LITMUS_API_BASE or LITMUS_API_KEY are not set.
+        The AI-generated reply string, or a generic fallback if credentials are missing.
     """
-    api_base = os.environ.get("LITMUS_API_BASE")
-    api_key = os.environ.get("LITMUS_API_KEY")
-    model = os.environ.get("LITMUS_CHAT_MODEL", _DEFAULT_CHAT_MODEL)
-
     if not api_base or not api_key:
         return _GENERIC_FALLBACK
 
@@ -92,9 +92,7 @@ async def generate_customer_reply(
         role = "user" if author == "trainee" else "assistant"
         messages.append({"role": role, "content": body})
 
-    # Use the OpenAI SDK directly with SSL verification disabled.
-    # This is required for internal company endpoints with self-signed certs.
-    async with httpx.AsyncClient(verify=False) as http_client:
+    async with httpx.AsyncClient(verify=ssl_verify) as http_client:
         client = AsyncOpenAI(
             base_url=api_base,
             api_key=api_key,

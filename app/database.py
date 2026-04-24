@@ -48,7 +48,36 @@ def init_db() -> None:
                 is_internal INTEGER NOT NULL DEFAULT 0,
                 created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
         """)
+
+
+# ── Settings operations ───────────────────────────────────────────────────────
+
+def get_setting(key: str) -> str | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = ?", (key,)
+        ).fetchone()
+        return row["value"] if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+
+
+def get_all_settings() -> dict[str, str]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        return {row["key"]: row["value"] for row in rows}
 
 
 # ── Ticket operations ─────────────────────────────────────────────────────────

@@ -1,26 +1,17 @@
 """
 grader.py — LLM-agnostic grading for trainee responses.
 
-Routes to the company's internal OpenAI-compatible API configured via
-environment variables.
-
-Required env vars:
-    LITMUS_API_BASE  — base URL of the internal API (e.g. https://ai.company.com/api)
-    LITMUS_API_KEY   — API key for the internal endpoint
-
-Optional:
-    LITMUS_GRADE_MODEL — model name for grading (default: gpt-4o-mini)
+AI config (api_base, api_key, model) is injected by the caller (main.py),
+which reads it from the database settings (with env-var fallback).
 """
 
 import json
-import os
 from dataclasses import dataclass
 
 import httpx
 from openai import OpenAI
 
 PASS_THRESHOLD = 70
-DEFAULT_GRADE_MODEL = "gpt-4o-mini"
 
 
 @dataclass
@@ -32,14 +23,16 @@ class GradeResult:
     key_issues: list[str]
 
 
-def _grade_model() -> str:
-    return os.environ.get(
-        "LITMUS_GRADE_MODEL",
-        os.environ.get("LITMUS_MODEL", DEFAULT_GRADE_MODEL),
-    )
-
-
-def grade_response(scenario: dict, ticket_thread: list[dict], escalated: bool) -> GradeResult:
+def grade_response(
+    scenario: dict,
+    ticket_thread: list[dict],
+    escalated: bool,
+    *,
+    api_base: str,
+    api_key: str,
+    model: str,
+    ssl_verify: bool = True,
+) -> GradeResult:
     """
     Grade a trainee's full ticket response against the scenario rubric.
 
@@ -47,6 +40,10 @@ def grade_response(scenario: dict, ticket_thread: list[dict], escalated: bool) -
         scenario:      Parsed scenario YAML dict.
         ticket_thread: List of comment dicts (chronological, public only).
         escalated:     True if the trainee checked the escalation box.
+        api_base:      OpenAI-compatible API base URL.
+        api_key:       API key for the endpoint.
+        model:         Model name to use for grading.
+        ssl_verify:    Set False for internal endpoints with self-signed certificates.
 
     Returns:
         GradeResult with score, feedback, and key issues.
@@ -96,17 +93,14 @@ Return a JSON object with exactly these fields:
 
 The score must reflect the rubric point deductions. Do not be lenient about critical failures."""
 
-    api_base = os.environ.get("LITMUS_API_BASE")
-    api_key = os.environ.get("LITMUS_API_KEY")
-
-    with httpx.Client(verify=False) as http_client:
+    with httpx.Client(verify=ssl_verify) as http_client:
         client = OpenAI(
             base_url=api_base,
             api_key=api_key,
             http_client=http_client,
         )
         response = client.chat.completions.create(
-            model=_grade_model(),
+            model=model,
             max_tokens=1024,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -134,7 +128,13 @@ The score must reflect the rubric point deductions. Do not be lenient about crit
     )
 
 
-def format_internal_note(grade: GradeResult, scenario: dict, trainee_name: str) -> str:
+def format_internal_note(
+    grade: GradeResult,
+    scenario: dict,
+    trainee_name: str,
+    *,
+    model: str,
+) -> str:
     """Format a GradeResult as a training grade report."""
     status_icon = "✅" if grade.passed else "❌"
     action_icon = "✅" if grade.action_correct else "❌"
@@ -146,7 +146,7 @@ def format_internal_note(grade: GradeResult, scenario: dict, trainee_name: str) 
 Trainee:         {trainee_name}
 Scenario:        {scenario['id']} — {scenario['title']}
 Expected action: {expected}
-Model:           {_grade_model()}
+Model:           {model}
 
 Score:           {grade.score}/100  {status_icon} {'PASSED' if grade.passed else 'FAILED'}
 Correct action:  {action_icon} {'Yes' if grade.action_correct else 'No — wrong resolve/escalate decision'}

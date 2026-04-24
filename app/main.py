@@ -11,16 +11,24 @@ Routes:
     GET  /tickets/{id}              — ticket conversation view
     POST /tickets/{id}/reply        — submit trainee reply → trigger AI customer reply
     POST /tickets/{id}/solve        — grade and close ticket
+    GET  /settings                  — AI provider settings page
+    POST /settings                  — save AI provider settings
+    POST /settings/test             — test AI connection (returns JSON)
 """
 
+import json
+import logging
+import os
 from pathlib import Path
 
+import httpx
 import jinja2
 import yaml
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from openai import AsyncOpenAI
 
 from app.chat import generate_customer_reply
 from app.database import (
@@ -28,9 +36,11 @@ from app.database import (
     create_ticket,
     get_all_tickets,
     get_comments,
+    get_setting,
     get_ticket,
     init_db,
     set_escalated,
+    set_setting,
     solve_ticket,
 )
 from app.grader import format_internal_note, grade_response
@@ -59,6 +69,53 @@ def _render(template_name: str, **context) -> HTMLResponse:
 
 
 SCENARIOS_DIR = Path("scenarios")
+
+# ── AI provider presets ───────────────────────────────────────────────────────
+# These populate the settings UI defaults when a provider is selected.
+
+PROVIDER_PRESETS = {
+    "openwebui": {
+        "label": "Open WebUI",
+        "description": "Internal or custom OpenAI-compatible server",
+        "api_base": "",
+        "api_base_placeholder": "https://ai.internal.yourcompany.com/api",
+        "api_base_editable": True,
+        "chat_model": "gpt-4o-mini",
+        "grade_model": "gpt-4o-mini",
+    },
+    "claude": {
+        "label": "Anthropic Claude",
+        "description": "claude-opus-4-7, claude-sonnet-4-6, …",
+        "api_base": "https://api.anthropic.com/v1",
+        "api_base_placeholder": "",
+        "api_base_editable": False,
+        "chat_model": "claude-sonnet-4-6",
+        "grade_model": "claude-sonnet-4-6",
+    },
+    "gemini": {
+        "label": "Google Gemini",
+        "description": "gemini-2.0-flash, gemini-1.5-pro, …",
+        "api_base": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "api_base_placeholder": "",
+        "api_base_editable": False,
+        "chat_model": "gemini-2.0-flash",
+        "grade_model": "gemini-2.0-flash",
+    },
+}
+
+
+def _load_ai_config() -> dict:
+    """Load AI config from DB settings, falling back to env vars."""
+    provider = get_setting("provider") or "openwebui"
+    return {
+        "provider":    provider,
+        "api_base":    get_setting("api_base")    or os.environ.get("LITMUS_API_BASE", ""),
+        "api_key":     get_setting("api_key")     or os.environ.get("LITMUS_API_KEY", ""),
+        "chat_model":  get_setting("chat_model")  or os.environ.get("LITMUS_CHAT_MODEL", "gpt-4o-mini"),
+        "grade_model": get_setting("grade_model") or os.environ.get("LITMUS_GRADE_MODEL", "gpt-4o-mini"),
+        # Public APIs (Claude, Gemini) have valid TLS certs; internal endpoints often don't.
+        "ssl_verify":  provider in ("claude", "gemini"),
+    }
 
 
 @app.on_event("startup")
@@ -166,13 +223,22 @@ async def reply(
     set_escalated(ticket_id, is_escalated)
 
     if scenario:
+        config = _load_ai_config()
         conversation = get_comments(ticket_id)
         try:
-            customer_reply = await generate_customer_reply(scenario, conversation)
+            customer_reply = await generate_customer_reply(
+                scenario,
+                conversation,
+                api_base=config["api_base"],
+                api_key=config["api_key"],
+                model=config["chat_model"],
+                ssl_verify=config["ssl_verify"],
+            )
             add_comment(ticket_id, customer_reply, "customer")
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("customer reply failed: %s: %s", type(exc).__name__, exc)
+            logging.getLogger(__name__).warning(
+                "customer reply failed: %s: %s", type(exc).__name__, exc
+            )
 
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
 
@@ -196,19 +262,87 @@ async def solve(
 
     set_escalated(ticket_id, is_escalated)
 
+    config = _load_ai_config()
     public_comments = [c for c in get_comments(ticket_id) if not c["is_internal"]]
     try:
-        grade = grade_response(scenario, public_comments, is_escalated)
+        grade = grade_response(
+            scenario,
+            public_comments,
+            is_escalated,
+            api_base=config["api_base"],
+            api_key=config["api_key"],
+            model=config["grade_model"],
+            ssl_verify=config["ssl_verify"],
+        )
         solve_ticket(ticket_id, score=grade.score)
-        note_body = format_internal_note(grade, scenario, ticket["trainee"])
+        note_body = format_internal_note(
+            grade, scenario, ticket["trainee"], model=config["grade_model"]
+        )
     except Exception as exc:
         solve_ticket(ticket_id, score=None)
         note_body = (
             f"GRADING FAILED — ticket marked solved without a score.\n\n"
             f"Error: {type(exc).__name__}: {exc}\n\n"
-            f"Check that LITMUS_API_BASE and LITMUS_API_KEY are set in .env."
+            f"Check AI settings at /settings."
         )
 
     add_comment(ticket_id, note_body, "system", is_internal=True)
 
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+
+
+# ── Settings routes ───────────────────────────────────────────────────────────
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request, saved: str | None = None) -> HTMLResponse:
+    config = _load_ai_config()
+    has_key = bool(config["api_key"])
+    presets_json = json.dumps(PROVIDER_PRESETS)
+    return _render(
+        "settings.html",
+        config=config,
+        has_key=has_key,
+        saved=saved,
+        presets_json=presets_json,
+    )
+
+
+@app.post("/settings")
+async def save_settings(
+    provider:    str = Form(...),
+    api_base:    str = Form(...),
+    api_key:     str = Form(""),
+    chat_model:  str = Form(...),
+    grade_model: str = Form(...),
+) -> RedirectResponse:
+    set_setting("provider",    provider.strip())
+    set_setting("api_base",    api_base.strip())
+    set_setting("chat_model",  chat_model.strip())
+    set_setting("grade_model", grade_model.strip())
+    if api_key.strip():
+        set_setting("api_key", api_key.strip())
+    return RedirectResponse("/settings?saved=1", status_code=303)
+
+
+@app.post("/settings/test")
+async def test_connection(request: Request) -> JSONResponse:
+    """Quick connectivity check — sends a one-token chat completion."""
+    config = _load_ai_config()
+    if not config["api_base"] or not config["api_key"]:
+        return JSONResponse({"ok": False, "message": "API Endpoint URL and API Key are required."})
+    try:
+        async with httpx.AsyncClient(verify=config["ssl_verify"]) as http_client:
+            client = AsyncOpenAI(
+                base_url=config["api_base"],
+                api_key=config["api_key"],
+                http_client=http_client,
+            )
+            response = await client.chat.completions.create(
+                model=config["chat_model"],
+                messages=[{"role": "user", "content": "Reply with the single word: ok"}],
+                max_tokens=10,
+            )
+        reply = response.choices[0].message.content.strip()
+        return JSONResponse({"ok": True, "message": f"Connected. Model replied: {reply!r}"})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}"})
