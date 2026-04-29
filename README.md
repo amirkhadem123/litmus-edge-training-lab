@@ -1,57 +1,96 @@
-# Litmus Lab — L0 Support Training Simulation
+# Litmus Lab — Litmus Support Practice Certificate
 
-A self-contained web application for training customer support analysts on
-Litmus Edge L0 support skills. Trainees work through realistic simulated
-support tickets — reading customer messages and screenshots, diagnosing issues,
-writing remediation guides or escalation notes — and receive instant AI-generated
-feedback.
+A self-contained web application for training Litmus Edge Customer Support Analysts.
+Trainees work through realistic simulated support tickets, chat with a scripted AI
+customer, diagnose the root cause, and receive instant multi-dimensional AI-graded
+feedback. No trainer required. No live Litmus Edge instance needed.
 
-**No Zendesk. No live Litmus Edge instance. One internal API endpoint for
-everything.**
+> **v2 (this branch)** replaces the trainer-led ticket workflow with a fully
+> autonomous, self-paced certificate program structured around three graded
+> checkpoints.
 
 ---
 
 ## Table of Contents
 
 1. [How It Works](#how-it-works)
-2. [Repository Structure](#repository-structure)
-3. [Prerequisites](#prerequisites)
-4. [Local Setup (Dev)](#local-setup-dev)
-5. [Production Deployment (Docker)](#production-deployment-docker)
-6. [Cloudflare Access Integration](#cloudflare-access-integration)
-7. [Running a Training Session](#running-a-training-session)
-8. [Scenario Reference](#scenario-reference)
-9. [How Grading Works](#how-grading-works)
-10. [Adding New Scenarios](#adding-new-scenarios)
-11. [Escalation vs. Resolution](#escalation-vs-resolution)
+2. [Certificate Program Structure](#certificate-program-structure)
+3. [Repository Structure](#repository-structure)
+4. [Prerequisites](#prerequisites)
+5. [Local Setup (Dev)](#local-setup-dev)
+6. [Production Deployment (Docker)](#production-deployment-docker)
+7. [Scenario Reference](#scenario-reference)
+8. [How Grading Works](#how-grading-works)
+9. [Adding New Scenarios](#adding-new-scenarios)
+10. [AI Provider Configuration](#ai-provider-configuration)
+11. [Admin View](#admin-view)
 12. [Architecture](#architecture)
-13. [Legacy Code](#legacy-code)
+13. [Environment Variables](#environment-variables)
 
 ---
 
 ## How It Works
 
 ```
-Trainer opens /new  →  selects scenario + enters trainee name  →  ticket created
+Trainee visits the app
+  → Enters their name → dashboard shown
+  → Certificate checkpoints (CP1 → CP2 → CP3) unlock sequentially on pass
+  → Practice scenarios always available
 
-Trainee opens the ticket
-  → Reads the customer's opening message and screenshots
-  → Types replies to gather more information
-      (AI plays the customer, constrained by the scenario YAML)
-  → Optionally marks as Escalation
-  → Writes final response and clicks Solve Ticket
+Trainee begins a checkpoint or practice attempt
+  → Customer's opening support ticket displayed
+  → Trainee types replies to gather diagnostic information
+      (scripted keyword-matching replies — no generative AI, fully deterministic)
+  → Trainee clicks Resolve or Escalate, writes a final note
+  → Grading runs in background (~5–10 seconds)
+  → Multi-dimensional score + per-dimension feedback shown
 
-On Solve:
-  → Full conversation sent to LLM with the scenario rubric
-  → Score (0–100) + written feedback returned in ~3 seconds
-  → Grade note posted on the ticket
-
-Trainer debriefs with the trainee using the grade note.
+Repeat until all three checkpoints are passed → certificate complete
 ```
 
-The AI customer simulation is **tightly constrained by the scenario YAML** — what
-the customer knows, what they don't know, and how they behave are all defined by
-the scenario author. The LLM cannot invent facts that aren't in the scenario.
+**Customer simulation is scripted**, not generative. Each scenario defines a list
+of keyword triggers and pre-written replies. This ensures every trainee who asks
+the right diagnostic question gets the right information — regardless of phrasing —
+making grading fair and reproducible.
+
+**Grading is AI-powered** (OpenAI-compatible endpoint). The LLM evaluates each
+rubric dimension independently. Critical score caps (e.g. wrong resolve/escalate
+decision) are enforced in Python after the JSON is parsed — the LLM cannot
+soften or override them.
+
+---
+
+## Certificate Program Structure
+
+### Checkpoints
+
+| # | ID | Title | Difficulty | Expected Action |
+|---|-----|-------|-----------|----------------|
+| 1 | `cp-01` | Dashboard data stopped updating — plant floor sensor | Beginner | Resolve |
+| 2 | `cp-02` | OPC UA tags show Good quality but values appear frozen | Intermediate | Resolve |
+| 3 | `cp-03` | DeviceHub restarts every few hours, disconnecting all devices | Advanced | Escalate |
+
+**Unlock rules:**
+- CP1 is available immediately
+- CP2 unlocks when CP1 is passed (≥ 70/100)
+- CP3 unlocks when CP2 is passed
+- Each checkpoint allows a maximum of 2 attempts
+- After 2 failed attempts, the checkpoint is locked (no further re-attempts)
+
+**Pass threshold:** 70/100 for all checkpoints.
+
+**Critical penalty:** Choosing the wrong action (e.g. escalating a resolvable issue,
+or resolving when escalation is required) caps the score at ≤ 50 for CP3.
+
+### Practice Mode
+
+Practice scenarios are always available with no unlock requirement and do not
+count toward the certificate. Useful for warming up before checkpoints.
+
+| ID | Title | Difficulty | Expected Action |
+|----|-------|-----------|----------------|
+| `dh-s01` | OPC UA tags stuck at Bad:Disconnected despite device showing Connected | Intermediate | Resolve |
+| `dh-s02` | Modbus device shows Disconnected but tag data is still flowing | Beginner | Resolve |
 
 ---
 
@@ -60,35 +99,34 @@ the scenario author. The LLM cannot invent facts that aren't in the scenario.
 ```
 litmus-lab/
 │
-├── scenarios/                          ← Training scenario definitions (YAML)
-│   ├── dh-s01-opcua-bad-disconnected.yaml   ← DeviceHub: OPC UA Bad:Disconnected
-│   ├── dh-s02-modbus-false-disconnect.yaml  ← DeviceHub: Modbus false Disconnected
-│   └── screenshots/                    ← Pre-captured screenshots per scenario
-│       └── README.md
+├── scenarios/                              ← Training scenario definitions (YAML)
+│   ├── cp-01-define-the-problem.yaml       ← Checkpoint 1: stopped device
+│   ├── cp-02-investigate.yaml              ← Checkpoint 2: frozen OPC UA tags
+│   ├── cp-03-capstone.yaml                 ← Checkpoint 3: DeviceHub OOM restarts
+│   ├── dh-s01-opcua-bad-disconnected.yaml  ← Practice: OPC UA Bad:Disconnected
+│   └── dh-s02-modbus-false-disconnect.yaml ← Practice: Modbus false disconnect
 │
 ├── app/
-│   ├── main.py                         ← FastAPI routes
-│   ├── chat.py                         ← AI customer simulation
-│   ├── grader.py                       ← AI grading logic
-│   ├── database.py                     ← SQLite schema + CRUD helpers
+│   ├── main.py          ← FastAPI routes (all application logic)
+│   ├── database.py      ← SQLite schema + CRUD helpers
+│   ├── scenarios.py     ← YAML loader, keyword matcher, urgency injection
+│   ├── grader.py        ← Dimensional grading, penalty enforcement
 │   └── templates/
-│       ├── base.html                   ← Shared layout (sepia theme)
-│       ├── queue.html                  ← Ticket list
-│       ├── new_ticket.html             ← Create ticket form
-│       └── ticket.html                 ← Ticket conversation view
+│       ├── base.html           ← Shared layout (sepia theme)
+│       ├── start.html          ← Trainee name entry page
+│       ├── dashboard.html      ← Checkpoint cards + practice table
+│       ├── attempt.html        ← Live ticket conversation view
+│       ├── results.html        ← Grade breakdown page
+│       ├── settings.html       ← AI provider configuration
+│       ├── admin.html          ← Admin: all trainees + progress (password-protected)
+│       └── admin_attempt.html  ← Admin: individual attempt detail
 │
-├── Dockerfile                          ← Production container build
-├── docker-compose.yml                  ← App + nginx orchestration
-├── nginx.conf                          ← Reverse proxy config (CF header passthrough)
-│
-├── scripts/
-│   └── list_scenarios.py               ← CLI — list scenarios with metadata
-│
-├── _legacy/                            ← Archived earlier phases (see _legacy/README.md)
-│
-├── .env.example                        ← Environment variable template
-├── requirements.txt                    ← Python dependencies
-└── README.md                           ← This file
+├── Dockerfile           ← Production container build
+├── docker-compose.yml   ← App + nginx orchestration
+├── nginx.conf           ← Reverse proxy config
+├── .env.example         ← Environment variable template
+├── requirements.txt     ← Python dependencies
+└── README.md            ← This file
 ```
 
 ---
@@ -97,9 +135,8 @@ litmus-lab/
 
 - **Python 3.12+** (for local dev)
 - **Docker + Docker Compose** (for production deployment)
-- **An OpenAI-compatible API endpoint** — the company's internal AI API, OpenAI
-  direct, Azure OpenAI, or a local server like LM Studio
-- **Screenshots** for each scenario — see `scenarios/screenshots/README.md`
+- **An OpenAI-compatible API endpoint** — Anthropic Claude, Google Gemini, or any
+  OpenAI-compatible server (Open WebUI, LM Studio, Azure OpenAI, etc.)
 
 ---
 
@@ -111,7 +148,20 @@ litmus-lab/
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment
+### 2. Start the server
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open `http://localhost:8000` and go to `/settings` to configure your AI provider.
+
+The app starts without any `.env` file. AI settings are configured through the
+web UI at `/settings` and stored in the SQLite database.
+
+### 3. (Optional) Seed environment variables
+
+If you prefer environment variables over the UI, copy `.env.example`:
 
 ```bash
 cp .env.example .env
@@ -120,44 +170,27 @@ cp .env.example .env
 Edit `.env`:
 
 ```bash
-LITMUS_API_BASE=https://ai.internal.yourcompany.com/v1
-LITMUS_API_KEY=your-key-here
-
-# Optional — defaults to gpt-4o-mini
-LITMUS_CHAT_MODEL=gpt-4o-mini
-LITMUS_GRADE_MODEL=gpt-4o-mini
+LITMUS_API_BASE=https://api.anthropic.com/v1
+LITMUS_API_KEY=sk-ant-...
+LITMUS_GRADE_MODEL=claude-haiku-4-5-20251001
 ```
 
-The app uses the same endpoint for both AI customer simulation and grading.
-Any OpenAI-compatible API works: company internal, OpenAI direct, Azure OpenAI,
-or a local server like LM Studio (`LITMUS_API_BASE=http://localhost:1234/v1`).
+Environment variables serve as defaults; settings saved through the UI take
+precedence.
 
-SSL certificate verification is disabled by default — required for internal
-company endpoints that use self-signed or private CA certificates.
+### 4. Fresh start
 
-### 3. Start the server
+To reset all trainee progress, delete the database file:
 
 ```bash
-uvicorn app.main:app --reload
+rm litmus_lab.db
 ```
 
-Open `http://localhost:8000`.
-
-> **No API key?** The app still works — customer replies will be generic
-> fallbacks, and grading will fail with an informative error note on the ticket
-> instead of crashing.
-
-### 4. (Optional) Add screenshots
-
-Follow `scenarios/screenshots/README.md`. Tickets work without screenshots but
-the diagnostic experience is richer with them.
+The app recreates the schema automatically on next startup.
 
 ---
 
 ## Production Deployment (Docker)
-
-The app ships as a Docker container fronted by nginx. Designed for deployment on
-a VM behind Cloudflare WARP/Access.
 
 ### 1. Build and start
 
@@ -168,12 +201,12 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-The app is now reachable at `http://your-server` (port 80).
+The app is reachable at `http://your-server` (port 80, fronted by nginx).
 
 ### 2. Persistent data
 
-The SQLite database is stored in a named Docker volume (`litmus_data`) mounted
-at `/data` inside the container. It survives container restarts and rebuilds.
+The SQLite database is stored in a Docker volume (`litmus_data`) at `/data`
+inside the container. It survives restarts and rebuilds.
 
 ```bash
 # Back up the database
@@ -188,150 +221,29 @@ git pull
 docker compose up -d --build
 ```
 
-The volume is preserved; no data is lost on update.
+Data is preserved. No migration needed — the schema is recreated from scratch
+only if the database file doesn't exist.
 
----
+### 4. Admin access
 
-## Cloudflare Access Integration
+Visit `http://your-server/admin?pw=YOUR_ADMIN_PASSWORD`.
 
-When deployed behind **Cloudflare Access**, the authenticated user's email is
-automatically injected as the `Cf-Access-Authenticated-User-Email` header. The
-app reads this header to pre-populate the trainee name field on the "New Ticket"
-form — so trainees don't need to type their name.
-
-The nginx config forwards this header to the app:
-
-```nginx
-proxy_set_header Cf-Access-Authenticated-User-Email
-                 $http_cf_access_authenticated_user_email;
-```
-
-To test locally:
-
-```bash
-curl -H "Cf-Access-Authenticated-User-Email: jane.doe@company.com" \
-  http://localhost:8000/new
-```
-
-The trainee field will be pre-filled with `jane.doe@company.com`.
-
----
-
-## Running a Training Session
-
-### Step 1 — Create the ticket (Trainer)
-
-Open `http://your-server/new`, select a scenario, and enter the trainee's name.
-Click **Create Ticket**. Share the ticket URL or sit with the trainee.
-
-### Step 2 — Trainee works the ticket
-
-The trainee reads the customer's opening message and any attached screenshots,
-then asks the customer clarifying questions using the reply box.
-
-**The AI customer replies immediately**, staying strictly in character based on
-the scenario definition. The customer only knows what the scenario says they
-know — they cannot accidentally reveal the root cause.
-
-Example conversation (le-s01):
-
-> **Trainee:** Can you open DeviceHub and check what status PLC-Line3 shows?
->
-> **Carlos Mendes:** I just opened DeviceHub and found PLC-Line3. It shows a
-> red icon and says "Stopped". I assumed it was a display glitch since the
-> hardware is definitely online. Is that the problem?
->
-> **Trainee:** Yes — that's the issue. The device is in a Stopped state in
-> Litmus Edge, which means it has stopped polling the PLC and publishing data.
-> To fix it: go to DeviceHub, find PLC-Line3, and click the ▶ Start button.
-> Once it shows as Running, check that data is flowing again in the tag list.
-
-### Step 3 — Solve the ticket
-
-- **Resolve scenarios (le-s01 to le-s04):** Write a clear solution guide, leave
-  Escalation unchecked, click **Solve Ticket**.
-- **Escalation scenarios (le-s05, le-s06):** Check **Mark as Escalation**, write
-  an escalation note with all diagnostic context, click **Solve Ticket**.
-
-Grading runs immediately. The grade note appears on the ticket within ~3 seconds.
-
-### Step 4 — Debrief
-
-```
-LITMUS LAB — TRAINING GRADE
-──────────────────────────────────────────────────
-Trainee:         Jane Doe
-Scenario:        le-s01 — Device stopped publishing data to MQTT
-Expected action: RESOLVE
-Model:           gpt-4o-mini
-
-Score:           85/100  ✅ PASSED
-Correct action:  ✅ Yes
-
-KEY OBSERVATIONS:
-  • Correctly identified the stopped device state from the screenshot
-  • Provided accurate DeviceHub → Start instructions
-  • Did not ask the customer to confirm data resumed — minor gap
-
-TRAINER FEEDBACK:
-  [2–3 paragraphs of specific written feedback addressed to the trainee]
-──────────────────────────────────────────────────
-```
+Set the password via the `LITMUS_ADMIN_PASSWORD` environment variable. If the
+variable is not set, the admin page is inaccessible.
 
 ---
 
 ## Scenario Reference
 
-### DeviceHub Scenarios
+### Scenario YAML structure
 
-| ID | Title | Action | Difficulty |
-|----|-------|--------|-----------|
-| `dh-s01` | OPC UA tags stuck at Bad:Disconnected despite device showing Connected | Resolve | Intermediate |
-| `dh-s02` | Modbus device shows Disconnected but tag data is still flowing | Resolve | Beginner |
-
-**Suggested training order:** dh-s02 → dh-s01
-
-Start with dh-s02 (beginner) so trainees learn to distinguish UI status from actual data
-flow before tackling the more diagnostic dh-s01 (OPC UA subscription errors).
-
----
-
-## How Grading Works
-
-When a ticket is solved, the app:
-
-1. Collects the full public comment thread (customer + trainee messages)
-2. Loads the scenario's `grading_rubric` and `root_cause` fields
-3. Detects whether the Escalation checkbox was checked
-4. Sends everything to the configured LLM with a structured grading prompt
-5. Parses the JSON response into a score + feedback
-6. Stores the score on the ticket (visible in the queue list)
-7. Posts the formatted grade note on the ticket as an internal note
-
-**Score breakdown (typical resolve scenario):**
-- 50 pts — Correct root cause identified
-- 25 pts — Accurate resolution/escalation steps
-- 15 pts — Professional, clear communication
-- 10 pts — Asked customer to verify the fix
-
-**Passing threshold:** 70/100
-
-**Critical penalties:**
-- Escalating when the issue is L0-fixable: −40 pts
-- NOT escalating when escalation is required: −50 pts (automatic ≤50 score cap)
-
-Grading is non-deterministic. Treat scores as guidance, not objective
-measurements. The written feedback paragraph is more valuable than the number.
-
----
-
-## Adding New Scenarios
-
-Create a YAML file in `scenarios/` using this schema:
+Every scenario defines:
 
 ```yaml
-id: le-s07                          # unique ID, used in the UI and DB
-title: Short descriptive title
+id: cp-01                            # unique identifier
+title: "Short descriptive title"
+mode: certificate | practice         # certificate → checkpoint; practice → always available
+checkpoint: 1                        # 1, 2, or 3 (certificate only)
 difficulty: beginner | intermediate | advanced
 expected_action: resolve | escalate
 
@@ -341,114 +253,228 @@ customer:
   le_version: "4.0.6"
 
 ticket:
-  subject: "Subject line for the ticket"
+  subject: "Subject line"
   initial_message: |
-    The customer's opening message. Written in first person.
-    Include symptoms, what they've already checked, and urgency level.
+    Customer's opening email. Written in first person.
 
-  attachments:                      # optional; paths relative to scenarios/screenshots/
-    - le-s07/screenshot1.png
-
-diagnostic_checklist:               # shown in the sidebar to guide the trainee
-  - "Question 1 to prompt structured thinking"
-  - "Question 2"
-  - "Question 3"
+diagnostic_checklist:
+  - "Checklist item shown in the sidebar to guide the trainee"
 
 root_cause: |
-  Internal explanation of what's actually wrong.
-  Not shown to the trainee — used by the grader only.
+  Internal explanation. NOT shown to the trainee — used by the grader only.
 
-correct_response_summary: |         # for resolve scenarios
-  1. Step one the trainee should take
+correct_response_summary: |          # for resolve scenarios
+  1. Step one
   2. Step two
-  3. Step three
 
-escalation_reason: |                # for escalate scenarios (replaces correct_response_summary)
-  Why this cannot be fixed at L0 and what engineering needs to do.
+# Scripted keyword-triggered customer replies
+scripted_replies:
+  - triggers:
+      - "log"
+      - "device log"
+      - "check the log"
+    reply: |
+      I've opened the device log. I see the following error repeating...
 
-grading_rubric: |
-  Point-by-point grading instructions for the LLM.
-  Use named sections with point values (e.g. "CRITICAL (50 pts): ...").
-  Score range: 0–100. Passing threshold: 70.
+  - triggers:
+      - "restart"
+    reply: |
+      I tried restarting but the issue came back within minutes.
 
-# ── AI customer simulation context ───────────────────────────────────────────
-customer_ai_context:
-  knows: |
-    - Bullet list of facts the customer knows and can report
-    - Include specific values, status indicators, and things they observed
-    - Be specific — "the device shows red icon and status Stopped" not "device has an issue"
-  does_not_know: |
-    - Things the customer cannot reveal (root cause, technical internals)
-    - Things they genuinely don't know
-  behavior: |
-    - How the customer communicates (technical? non-technical? urgent? confused?)
-    - What they do when asked to check something in the UI
-    - Any specific pushback or constraints (e.g., "can't roll back", "appliance is locked")
+fallback_reply: |
+  I'm not sure what you mean. Could you be more specific?
+
+# Urgency injection (optional — CP3 only)
+urgency_injection:
+  enabled: true
+  trigger_after_customer_message: 3  # fires on the 3rd customer reply
+  text: |
+    I should also mention — we have a compliance audit in 48 hours...
+
+# Dimensional grading rubric
+grading_rubric:
+  pass_threshold: 70
+  dimensions:
+    - name: Proactive first response
+      max_points: 40
+      description: |
+        Award full points if the trainee immediately directed the customer to
+        DeviceHub to check device status...
+
+    - name: Symptom extraction
+      max_points: 35
+      description: |
+        Award full points if the trainee gathered: device status, timing,
+        and recent changes...
+
+  critical_penalties:
+    - condition: wrong_direction
+      cap: cap_at_50
+      applies_to_checkpoints: [3]    # empty list [] = never applies
+
+    - condition: sequence_skipped
+      cap: cap_at_40
+      applies_to_checkpoints: [2]
 ```
 
-Then add screenshots to `scenarios/screenshots/le-s07/` and restart the server.
-Run `python scripts/list_scenarios.py --verbose` to verify the YAML is valid.
+### Keyword matching
 
-### Tips for good `customer_ai_context`
+The customer reply engine uses case-insensitive partial matching. The first
+matching trigger in the `scripted_replies` list wins, so order from
+most-specific to least-specific.
 
-- **`knows`** — be as specific as the scripted replies used to be. Include exact
-  status text, exact error messages, exact values. The AI uses this to answer
-  questions accurately.
-- **`does_not_know`** — list the root cause and any technical details that would
-  make the scenario too easy to solve without investigation.
-- **`behavior`** — define the customer's persona and response patterns. A
-  non-technical operations manager behaves very differently from an automation
-  engineer. Mention urgency level and any notable constraints.
+A trigger of `"log"` matches any trainee message containing the word "log"
+(e.g. "please check the device log", "can you open the log file?").
 
 ---
 
-## Escalation vs. Resolution
+## How Grading Works
 
-Teaching trainees *when* to escalate is as important as teaching them *how* to
-resolve. The escalation scenarios (le-s05, le-s06) are designed to penalise
-incorrect resolution attempts heavily.
+When a trainee submits their final note, grading runs in the background:
 
-**L0 analysts should escalate when:**
-- The issue is a confirmed platform bug requiring a software patch or firmware upgrade
-- The fix requires appliance-level access beyond what the Litmus Edge UI provides
-- The issue involves data corruption or production data integrity risk
-- No configuration change in the Litmus Edge UI can resolve the problem
+1. Full conversation transcript sent to the configured LLM with:
+   - Scenario root cause and correct response summary
+   - Dimensional rubric (one dimension at a time)
+   - Instructions to return structured JSON
 
-**L0 analysts should NOT escalate when:**
-- The root cause is a configuration gap (missing tags, wrong group assignment)
-- The fix is a UI action (start a stopped device, start a stopped service)
-- The customer can follow step-by-step instructions to resolve it themselves
+2. LLM returns per-dimension scores and feedback paragraphs
+
+3. Python recomputes `total_score = sum(dimension scores)` — the LLM's self-reported
+   total is discarded to prevent score softening
+
+4. Critical penalties applied in Python:
+   - `wrong_direction`: trainee chose Resolve when expected Escalate (or vice versa)
+   - `sequence_skipped`: trainee jumped to the answer without diagnostic steps (CP2)
+
+5. `passed = total_score >= pass_threshold` (70)
+
+6. Grade stored in DB; checkpoint progress updated; next checkpoint unlocked if passed
+
+**Score example (CP1 — 3 dimensions):**
+
+| Dimension | Max | Example Score |
+|-----------|-----|--------------|
+| Proactive first response | 40 | 36 |
+| Symptom extraction | 35 | 28 |
+| Resolution accuracy | 25 | 20 |
+| **Total** | **100** | **84 — ✅ Passed** |
+
+Grading is non-deterministic. The written per-dimension feedback is more
+actionable than the numeric score. Treat scores as directional guidance.
+
+---
+
+## Adding New Scenarios
+
+### Certificate scenarios
+
+Create a file `scenarios/cp-04-yourtitle.yaml` following the schema above.
+Set `mode: certificate` and `checkpoint: 4`. Update checkpoint unlock logic in
+`app/database.py` if adding beyond CP3 (currently hardcoded for 1–3).
+
+### Practice scenarios
+
+Create `scenarios/dh-s03-yourtitle.yaml` (or `int-s01-`, `sys-s01-`, etc.)
+with `mode: practice`. No other changes needed — the dashboard picks up all
+`mode: practice` scenarios automatically.
+
+### Authoring scripted replies
+
+Good scripted replies follow these principles:
+
+- **Be specific in `knows`** — include exact status text, exact error messages,
+  exact field values. Vagueness forces trainees to guess instead of diagnose.
+- **Order triggers from specific to general** — "device log" before "log" if
+  both are defined, so the more specific trigger wins.
+- **Cover all diagnostic paths** — every question a well-trained analyst would
+  ask should have a matching scripted reply. Use the `fallback_reply` to catch
+  unexpected questions, not as a substitute for coverage.
+- **Match the customer's technical level** — non-technical customers should use
+  plain language; controls engineers can use Modbus/OPC UA terminology.
+
+---
+
+## AI Provider Configuration
+
+Visit `/settings` in the app to configure the AI provider. Settings are stored
+in the database and override environment variables.
+
+### Supported providers
+
+| Provider | Base URL | Notes |
+|----------|----------|-------|
+| Open WebUI | Your internal URL | SSL verification disabled (self-signed certs) |
+| Anthropic Claude | `https://api.anthropic.com/v1` | Default grade model: `claude-haiku-4-5-20251001` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/` | Default: `gemini-2.0-flash` |
+
+All providers use the OpenAI-compatible SDK. No Anthropic or Google SDK required.
+
+### Recommended model
+
+`claude-haiku-4-5-20251001` — fast, accurate at structured JSON output, cost-effective
+for grading. Set as the default for all providers in the UI presets.
+
+### Testing
+
+Use the **Test Connection** button in `/settings` to verify the endpoint and key
+are working before running a graded attempt.
+
+---
+
+## Admin View
+
+`GET /admin?pw=YOUR_ADMIN_PASSWORD`
+
+Shows:
+- All registered trainees with registration date
+- Checkpoint progress (CP1/CP2/CP3 status + best scores)
+- Last 5 attempts per trainee with links to full conversation + grade breakdown
+
+The admin password is set via the `LITMUS_ADMIN_PASSWORD` environment variable.
+If unset, the admin page returns 403 for all requests.
 
 ---
 
 ## Architecture
 
 ```
-[Employee browser]
-        │  (Cloudflare WARP VPN)
-[Cloudflare Access]  ← SSO authentication, injects user email header
-        │
-[nginx :80]          ← reverse proxy, forwards CF-Access header
-        │
-[FastAPI app :8000]  ← reads CF header, serves UI, calls AI API
-        │
-    ┌───┴────────────────────────────┐
-    │                                │
-[SQLite DB]               [Company AI API]
-(tickets + comments,      (OpenAI-compatible endpoint)
- WAL mode for concurrent     ├─ LITMUS_CHAT_MODEL → customer simulation
- multi-user access)          └─ LITMUS_GRADE_MODEL → ticket grading
+[Browser]
+   │
+[nginx :80]          ← reverse proxy
+   │
+[FastAPI app :8000]  ← cookie session (trainee_id), background grading tasks
+   │
+ ┌─┴─────────────────────────────┐
+ │                               │
+[SQLite DB (WAL mode)]   [AI Grading API]
+  ├─ trainees                (OpenAI-compatible)
+  ├─ attempts
+  ├─ messages
+  ├─ grades
+  ├─ checkpoint_progress
+  └─ settings
 ```
 
 **Key design decisions:**
-- **Single AI endpoint** — `LITMUS_API_BASE` routes both chat and grading through
-  the company's internal API. No external dependencies.
-- **Scenario-constrained AI** — the `customer_ai_context` YAML block becomes the
-  AI's system prompt. The AI cannot invent facts outside this context.
-- **WAL mode SQLite** — supports multiple simultaneous trainee sessions without
-  write contention.
-- **Stateless app layer** — the full conversation history is loaded from the DB
-  on every request; no in-memory session state.
+
+- **Scripted customer simulation** — deterministic keyword matching instead of
+  generative AI. Every trainee who asks the right question gets the right answer.
+  This is mandatory for fair grading.
+
+- **Penalties enforced in Python** — score caps for wrong direction and skipped
+  diagnostic sequences are applied after the LLM response is parsed. The LLM
+  cannot soften them.
+
+- **Background grading** — FastAPI `BackgroundTasks` runs grading after the HTTP
+  response is returned. The results page polls every 3 seconds until grading
+  completes.
+
+- **Cookie session** — trainee identity stored as a plain integer `trainee_id`
+  cookie (HttpOnly). No encryption needed — IDs are not security-sensitive.
+
+- **Single API endpoint for all providers** — OpenAI SDK with configurable
+  `base_url`. Works for Claude via Anthropic's OpenAI-compatible endpoint,
+  Gemini via Google's compatibility layer, and any self-hosted server.
 
 ---
 
@@ -456,19 +482,9 @@ incorrect resolution attempts heavily.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LITMUS_API_BASE` | Yes | — | Base URL of the OpenAI-compatible API |
-| `LITMUS_API_KEY` | Yes | — | API key for the endpoint |
-| `LITMUS_CHAT_MODEL` | No | `gpt-4o-mini` | Model for customer simulation |
-| `LITMUS_GRADE_MODEL` | No | `gpt-4o-mini` | Model for grading |
+| `LITMUS_API_BASE` | No | — | Base URL of the AI API (overridden by UI setting) |
+| `LITMUS_API_KEY` | No | — | API key (overridden by UI setting) |
+| `LITMUS_GRADE_MODEL` | No | `claude-haiku-4-5-20251001` | Grading model (overridden by UI) |
+| `LITMUS_PROVIDER` | No | `claude` | Provider name (`openwebui`, `claude`, `gemini`) |
 | `LITMUS_DATA_DIR` | No | `.` (project root) | Directory for the SQLite DB file |
-
----
-
-## Legacy Code
-
-The `_legacy/` directory contains retired code from earlier phases:
-
-- **Phase 1/2** — FastAPI app with live Litmus Edge SDK integration
-- **Phase 3** — Zendesk-integrated approach with real tickets and a polling grader
-
-See [`_legacy/README.md`](_legacy/README.md) for full details.
+| `LITMUS_ADMIN_PASSWORD` | No | — | Password for `/admin` (no admin access if unset) |
