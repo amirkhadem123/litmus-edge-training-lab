@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Attempt {{ attempt.id }} — Admin{% endblock %}
+
+{% block extra_styles %}
+.admin-attempt h1 { font-size: 1.2rem; font-weight: 700; color: #2c2318; margin-bottom: 0.3rem; }
+.meta-bar { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.82rem; color: #7a6e62; margin-bottom: 1.5rem; }
+.thread { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
+.msg-compact {
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.msg-compact.customer { background: #e8f0f5; border-left: 3px solid #4a82a8; }
+.msg-compact.trainee  { background: #edf5ee; border-left: 3px solid #4a7a4e; }
+.msg-sender { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #7a6e62; margin-bottom: 0.15rem; }
+
+.grade-panel {
+  background: #ede8df;
+  border: 1px solid #c8bfaf;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.grade-panel h2 { font-size: 1rem; font-weight: 700; color: #2c2318; margin-bottom: 0.75rem; }
+.dim-row { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem; font-size: 0.85rem; }
+.dim-row .dim-name { flex: 1; color: #4a3e32; }
+.dim-row .dim-score { font-weight: 700; color: #2c2318; white-space: nowrap; }
+{% endblock %}
+
+{% block content %}
+<div class="admin-attempt">
+  <a href="/admin" style="font-size:0.85rem">← Admin</a>
+  <h1 style="margin-top:0.5rem">Attempt #{{ attempt.id }} — {{ attempt.scenario_id }}</h1>
+  <div class="meta-bar">
+    <span>Trainee: <strong>{{ trainee.name }}</strong></span>
+    <span>Mode: {{ attempt.mode }}</span>
+    {% if attempt.checkpoint %}<span>Checkpoint {{ attempt.checkpoint }}</span>{% endif %}
+    <span>Attempt #{{ attempt.attempt_number }}</span>
+    <span>Status: {{ attempt.status }}</span>
+    {% if attempt.trainee_action %}<span>Action: {{ attempt.trainee_action }}</span>{% endif %}
+  </div>
+
+  {% if grade %}
+  <div class="grade-panel">
+    <h2>Grade: {{ grade.total_score }}/100 — {% if grade.passed %}✅ Passed{% else %}❌ Not Passed{% endif %}</h2>
+    <p style="font-size:0.82rem;color:#7a6e62;margin-bottom:0.75rem">
+      Expected: {{ grade.expected_action }} · Got: {{ grade.trainee_action }} ·
+      Direction: {% if grade.correct_direction %}✅ Correct{% else %}❌ Wrong{% endif %}
+    </p>
+    {% if grade.dimension_scores %}
+    {% for d in grade.dimension_scores %}
+    <div class="dim-row">
+      <span class="dim-name">{{ d.name }}</span>
+      <span class="dim-score">{{ d.score }}/{{ d.max_points }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% if grade.overall_feedback %}
+    <div style="margin-top:0.75rem;font-size:0.85rem;color:#4a3e32;white-space:pre-wrap;line-height:1.6">{{ grade.overall_feedback }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <h3 style="font-size:0.75rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#8a7e72;margin-bottom:0.75rem">Conversation</h3>
+  <div class="thread">
+    {% for msg in messages %}
+    <div>
+      <div class="msg-sender">{{ msg.sender }}</div>
+      <div class="msg-compact {{ msg.sender }}">{{ msg.content }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

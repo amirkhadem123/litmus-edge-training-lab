@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Welcome — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+.start-wrap {
+  max-width: 480px;
+  margin: 5rem auto 0;
+}
+.start-card {
+  background: #ede8df;
+  border: 1px solid #c8bfaf;
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+}
+.start-card h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2c2318;
+  margin-bottom: 0.4rem;
+}
+.start-card .subtitle {
+  color: #7a6e62;
+  font-size: 0.9rem;
+  margin-bottom: 1.75rem;
+  line-height: 1.5;
+}
+.start-card .form-group { margin-bottom: 1.25rem; }
+{% endblock %}
+
+{% block content %}
+<div class="start-wrap">
+  <div class="start-card">
+    <h1>Litmus Support Practice Certificate</h1>
+    <p class="subtitle">
+      Enter your name to begin. Your progress is saved automatically so you can
+      pick up where you left off.
+    </p>
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom:1rem">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/start">
+      <div class="form-group">
+        <label for="name">Your name</label>
+        <input type="text" id="name" name="name" placeholder="e.g. Jane Doe"
+               autocomplete="name" autofocus required />
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%">
+        Continue →
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

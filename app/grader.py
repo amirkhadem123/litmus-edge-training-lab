@@ -1,12 +1,16 @@
 """
-grader.py — LLM-agnostic grading for trainee responses.
+grader.py — Dimensional grading for Litmus Lab v2.
 
-AI config (api_base, api_key, model) is injected by the caller (main.py),
-which reads it from the database settings (with env-var fallback).
+Grading uses a single Claude API call (or any OpenAI-compatible endpoint).
+The LLM evaluates each rubric dimension independently and returns structured JSON.
+Critical score penalties are applied in Python AFTER the JSON is parsed —
+they are never left to the LLM.
+
+AI config (api_base, api_key, model, ssl_verify) is injected by the caller.
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from openai import OpenAI
@@ -16,17 +20,20 @@ PASS_THRESHOLD = 70
 
 @dataclass
 class GradeResult:
-    score: int
+    total_score: int
     passed: bool
-    action_correct: bool
-    feedback: str
-    key_issues: list[str]
+    expected_action: str
+    trainee_action: str
+    correct_direction: bool
+    dimensions: list[dict]        # [{name, max_points, score, feedback}, ...]
+    overall_feedback: str
+    raw_response: str = field(default="")
 
 
 def grade_response(
     scenario: dict,
-    ticket_thread: list[dict],
-    escalated: bool,
+    messages: list[dict],
+    trainee_action: str,
     *,
     api_base: str,
     api_key: str,
@@ -34,64 +41,85 @@ def grade_response(
     ssl_verify: bool = True,
 ) -> GradeResult:
     """
-    Grade a trainee's full ticket response against the scenario rubric.
+    Grade a trainee's full attempt against the scenario's dimensional rubric.
 
     Args:
-        scenario:      Parsed scenario YAML dict.
-        ticket_thread: List of comment dicts (chronological, public only).
-        escalated:     True if the trainee checked the escalation box.
-        api_base:      OpenAI-compatible API base URL.
-        api_key:       API key for the endpoint.
-        model:         Model name to use for grading.
-        ssl_verify:    Set False for internal endpoints with self-signed certificates.
+        scenario:       Parsed scenario YAML dict.
+        messages:       Chronological list of message dicts (sender, content).
+        trainee_action: "resolve" or "escalate" — what the trainee chose.
+        api_base:       OpenAI-compatible API base URL.
+        api_key:        API key.
+        model:          Model name.
+        ssl_verify:     False for internal endpoints with self-signed certs.
 
     Returns:
-        GradeResult with score, feedback, and key issues.
+        GradeResult with dimensional scores and feedback.
     """
     expected_action = scenario["expected_action"]
-    action_correct = (
-        (expected_action == "escalate" and escalated)
-        or (expected_action == "resolve" and not escalated)
-    )
+    correct_direction = trainee_action == expected_action
 
-    transcript = _format_thread(ticket_thread)
+    rubric = scenario.get("grading_rubric", {})
+    dimensions = rubric.get("dimensions", [])
+    pass_threshold = rubric.get("pass_threshold", PASS_THRESHOLD)
+
+    transcript = _format_transcript(messages)
+    dimensions_prompt = _format_dimensions_for_prompt(dimensions)
+
+    red_herring_block = ""
+    rh = scenario.get("red_herring", {})
+    if rh.get("enabled"):
+        red_herring_block = f"\n**Red herring:** {rh.get('description', '').strip()}\n"
 
     system_prompt = (
-        "You are an expert Litmus Edge L0 customer support trainer. "
-        "You are evaluating a trainee support analyst's response to a simulated support ticket. "
-        "Be fair but rigorous. Score based on the rubric provided. "
-        "Return ONLY valid JSON — no markdown, no explanation outside the JSON object."
+        "You are an expert Litmus Edge L0 customer support trainer evaluating a trainee's "
+        "response to a simulated support ticket. Be fair but rigorous. "
+        "Score each dimension independently based on the guidance provided. "
+        "Return ONLY valid JSON — no markdown fences, no text outside the JSON object."
     )
 
     user_prompt = f"""## Scenario Context
 
-**Title:** {scenario['title']}
-**Expected action:** {expected_action.upper()} (trainee should {"escalate to engineering" if expected_action == "escalate" else "provide a resolution guide to the customer"})
-**Root cause:** {scenario['root_cause']}
-{"**Escalation reason:** " + scenario.get('escalation_reason', '') if expected_action == 'escalate' else ""}
-**Correct response summary:** {scenario.get('correct_response_summary', 'N/A')}
-
-## Grading Rubric
-{scenario['grading_rubric']}
+**Title:** {scenario.get('title', '')}
+**Checkpoint:** {scenario.get('checkpoint', 'Practice')}
+**Expected action:** {expected_action.upper()}
+**Root cause:** {scenario.get('root_cause', '').strip()}
+{red_herring_block}
+**Correct response summary:** {scenario.get('correct_response_summary', scenario.get('escalation_reason', 'N/A')).strip()}
 
 ## Trainee's Action
-- Applied 'escalate' tag: {"YES" if escalated else "NO"}
-- Expected: {"escalate" if expected_action == "escalate" else "resolve (do NOT escalate)"}
-- Action correct: {"YES" if action_correct else "NO — this is a critical failure"}
+- Trainee chose: {trainee_action.upper()}
+- Expected: {expected_action.upper()}
+- Direction correct: {"YES" if correct_direction else "NO — critical failure"}
 
-## Full Ticket Thread (chronological)
+## Grading Dimensions
+{dimensions_prompt}
+
+## Full Conversation Transcript
 {transcript}
 
 ## Your Task
-Evaluate the trainee's response strictly according to the rubric above.
-Return a JSON object with exactly these fields:
+Evaluate the trainee's performance against each dimension above.
+For each dimension, assign a score within its point range and write one paragraph of feedback.
+Also write an overall 2–3 paragraph summary.
+
+Return a JSON object with EXACTLY this structure:
 {{
-  "score": <integer 0-100>,
-  "feedback": "<2-3 paragraph written feedback addressed to the trainee>",
-  "key_issues": ["<specific strength or gap>", "<another one>", ...]
+  "total_score": <sum of all dimension scores, integer>,
+  "sequence_skipped": <true if trainee jumped to conclusion without following elimination sequence, else false>,
+  "dimensions": [
+    {{
+      "name": "<exact dimension name>",
+      "max_points": <integer>,
+      "score": <integer within 0..max_points>,
+      "feedback": "<one paragraph>"
+    }},
+    ...
+  ],
+  "overall_feedback": "<2-3 paragraph summary>"
 }}
 
-The score must reflect the rubric point deductions. Do not be lenient about critical failures."""
+The total_score MUST equal the sum of all dimension scores.
+Do not soften penalties — apply rubric guidance strictly."""
 
     with httpx.Client(verify=ssl_verify) as http_client:
         client = OpenAI(
@@ -101,7 +129,7 @@ The score must reflect the rubric point deductions. Do not be lenient about crit
         )
         response = client.chat.completions.create(
             model=model,
-            max_tokens=1024,
+            max_tokens=2048,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
@@ -110,6 +138,7 @@ The score must reflect the rubric point deductions. Do not be lenient about crit
 
     raw = response.choices[0].message.content.strip()
 
+    # Strip markdown fences if LLM added them despite instructions
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -118,60 +147,110 @@ The score must reflect the rubric point deductions. Do not be lenient about crit
 
     result = json.loads(raw)
 
-    score = max(0, min(100, int(result["score"])))
+    # Recompute total from dimension scores (prevents LLM from softening the sum)
+    computed_total = sum(d["score"] for d in result.get("dimensions", []))
+    result["total_score"] = computed_total
+
+    # Apply critical penalties in code
+    result = _apply_penalties(result, scenario, correct_direction)
+
+    passed = result["total_score"] >= pass_threshold
+
     return GradeResult(
-        score=score,
-        passed=score >= PASS_THRESHOLD,
-        action_correct=action_correct,
-        feedback=result["feedback"],
-        key_issues=result.get("key_issues", []),
+        total_score=result["total_score"],
+        passed=passed,
+        expected_action=expected_action,
+        trainee_action=trainee_action,
+        correct_direction=correct_direction,
+        dimensions=result.get("dimensions", []),
+        overall_feedback=result.get("overall_feedback", ""),
+        raw_response=raw,
     )
 
 
-def format_internal_note(
-    grade: GradeResult,
-    scenario: dict,
-    trainee_name: str,
-    *,
-    model: str,
-) -> str:
-    """Format a GradeResult as a training grade report."""
-    status_icon = "✅" if grade.passed else "❌"
-    action_icon = "✅" if grade.action_correct else "❌"
-    expected = scenario["expected_action"].upper()
-    issues_block = "\n".join(f"  • {issue}" for issue in grade.key_issues)
+def _apply_penalties(result: dict, scenario: dict, correct_direction: bool) -> dict:
+    """Enforce critical score caps as defined in the scenario rubric. In-place."""
+    rubric = scenario.get("grading_rubric", {})
+    penalties = rubric.get("critical_penalties", [])
+    checkpoint = scenario.get("checkpoint")
 
-    return f"""LITMUS LAB — TRAINING GRADE
-{'─' * 50}
-Trainee:         {trainee_name}
-Scenario:        {scenario['id']} — {scenario['title']}
-Expected action: {expected}
-Model:           {model}
+    for penalty in penalties:
+        applies = checkpoint in penalty.get("applies_to_checkpoints", [])
+        if not applies:
+            continue
 
-Score:           {grade.score}/100  {status_icon} {'PASSED' if grade.passed else 'FAILED'}
-Correct action:  {action_icon} {'Yes' if grade.action_correct else 'No — wrong resolve/escalate decision'}
+        condition = penalty["condition"]
+        # YAML uses either "cap" or legacy "effect" key; both use "cap_at_N" format
+        cap_str = penalty.get("cap", penalty.get("effect", "cap_at_0"))
 
-KEY OBSERVATIONS:
-{issues_block if issues_block else '  (none recorded)'}
+        triggered = False
+        if condition == "wrong_direction" and not correct_direction:
+            triggered = True
+        elif condition == "sequence_skipped" and result.get("sequence_skipped"):
+            triggered = True
 
-TRAINER FEEDBACK:
-{grade.feedback}
-{'─' * 50}"""
+        if triggered:
+            cap = int(cap_str.split("_")[-1])  # "cap_at_50" → 50
+            result["total_score"] = min(result["total_score"], cap)
+
+    return result
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _format_thread(comments: list[dict]) -> str:
-    """Convert the comment list into a readable transcript for the LLM."""
-    author_labels = {
-        "customer": "CUSTOMER",
-        "trainee":  "TRAINEE",
-        "system":   "SYSTEM",
-    }
+def _format_transcript(messages: list[dict]) -> str:
     lines = []
-    for i, comment in enumerate(comments, 1):
-        author_type = comment.get("author_type", "unknown")
-        label = author_labels.get(author_type, author_type.upper())
-        body = comment.get("body", "").strip()
-        lines.append(f"[Comment {i} — {label}]\n{body}\n")
-    return "\n".join(lines)
+    for i, msg in enumerate(messages, 1):
+        sender = msg.get("sender", "unknown").upper()
+        content = msg.get("content", "").strip()
+        lines.append(f"[{i}] {sender}: {content}")
+    return "\n\n".join(lines)
+
+
+def _format_dimensions_for_prompt(dimensions: list[dict]) -> str:
+    parts = []
+    for d in dimensions:
+        guidance = d.get("description", d.get("guidance", "")).strip()
+        parts.append(
+            f"**{d['name']}** ({d['max_points']} points)\n{guidance}"
+        )
+    return "\n\n".join(parts)
+
+
+def format_grade_display(grade: GradeResult, scenario: dict, trainee_name: str, model: str) -> str:
+    """Plain-text grade summary for display in attempt view (monospace block)."""
+    checkpoint = scenario.get("checkpoint", "Practice")
+    title = scenario.get("title", scenario.get("id", ""))
+    status_icon = "✅ PASSED" if grade.passed else "❌ NOT PASSED"
+    direction_icon = "✅" if grade.correct_direction else "❌"
+
+    dim_scores = "\n".join(
+        f"  {d['name']:<35} {d['score']}/{d['max_points']}"
+        for d in grade.dimensions
+    )
+
+    dim_feedback = "\n\n".join(
+        f"  {d['name']}\n  {d['feedback']}"
+        for d in grade.dimensions
+    )
+
+    return f"""LITMUS LAB — CHECKPOINT {checkpoint} RESULT
+{'─' * 50}
+Trainee:          {trainee_name}
+Checkpoint:       {checkpoint} — {title}
+Expected action:  {grade.expected_action.upper()}
+Trainee action:   {grade.trainee_action.upper()}
+
+Score:            {grade.total_score}/100  {status_icon}
+Direction:        {direction_icon} {'Correct' if grade.correct_direction else 'Wrong — penalty applied'}
+Model:            {model}
+
+DIMENSION SCORES:
+{dim_scores}
+
+FEEDBACK BY DIMENSION:
+{dim_feedback}
+
+OVERALL:
+  {grade.overall_feedback}
+{'─' * 50}"""

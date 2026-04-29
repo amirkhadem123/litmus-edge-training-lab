@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}{{ scenario.ticket.subject }} — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+/* ── Two-column layout ─────────────────────────────────────────── */
+.attempt-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .attempt-layout { grid-template-columns: 1fr; }
+}
+
+/* ── Attempt header ────────────────────────────────────────────── */
+.attempt-header {
+  margin-bottom: 1.25rem;
+}
+.attempt-header h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #2c2318;
+  margin-bottom: 0.3rem;
+}
+.attempt-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: #7a6e62;
+}
+
+/* ── Conversation thread ───────────────────────────────────────── */
+.thread { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.msg {
+  max-width: 82%;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.msg-customer {
+  align-self: flex-start;
+  background: #e8f0f5;
+  border-left: 3px solid #4a82a8;
+  color: #1a2e3c;
+}
+.msg-trainee {
+  align-self: flex-end;
+  background: #edf5ee;
+  border-right: 3px solid #4a7a4e;
+  color: #1a2e18;
+  text-align: left;
+}
+.msg-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7a6e62;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Reply form ────────────────────────────────────────────────── */
+.reply-section {
+  margin-top: 1.5rem;
+  border-top: 1px solid #d8d0c0;
+  padding-top: 1.25rem;
+}
+.reply-section textarea {
+  min-height: 90px;
+  resize: vertical;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Submit section ────────────────────────────────────────────── */
+.submit-section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #d8d0c0;
+}
+.submit-section h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #2c2318;
+  margin-bottom: 0.5rem;
+}
+.submit-buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+/* ── Submission modal / inline form ───────────────────────────── */
+.submit-form {
+  display: none;
+  margin-top: 1rem;
+  background: #ede8df;
+  border: 1px solid #c8bfaf;
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+}
+.submit-form.visible { display: block; }
+.submit-form textarea { min-height: 100px; resize: vertical; margin-bottom: 0.75rem; }
+.submit-form .form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2c2318;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+/* ── Grading banner ────────────────────────────────────────────── */
+.grading-banner {
+  margin-top: 1.5rem;
+  background: #fdf5e0;
+  border: 1px solid #c8a040;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #6a4e10;
+  font-size: 0.9rem;
+}
+
+/* ── Sidebar cards ─────────────────────────────────────────────── */
+.sidebar-card {
+  background: #ede8df;
+  border: 1px solid #c8bfaf;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.sidebar-card h3 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #8a7e72;
+  margin-bottom: 0.7rem;
+}
+.sidebar-card .info-row {
+  font-size: 0.85rem;
+  color: #2c2318;
+  margin-bottom: 0.3rem;
+}
+.sidebar-card .info-label { color: #7a6e62; }
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li {
+  font-size: 0.82rem;
+  color: #4a3e32;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #d8d0c0;
+  line-height: 1.4;
+}
+.checklist li:last-child { border-bottom: none; }
+.checklist li::before { content: "□ "; color: #9c6b2e; }
+{% endblock %}
+
+{% block content %}
+<div class="attempt-layout">
+
+  <!-- ── Main column ──────────────────────────────────────────────── -->
+  <div>
+    <div class="attempt-header">
+      <div class="attempt-meta">
+        <a href="/dashboard">← Dashboard</a>
+        <span>·</span>
+        {% if attempt.checkpoint %}
+          <span>Checkpoint {{ attempt.checkpoint }}</span>
+        {% else %}
+          <span>Practice</span>
+        {% endif %}
+        <span>·</span>
+        <span>{{ scenario.id }}</span>
+      </div>
+      <h1>{{ scenario.ticket.subject }}</h1>
+      <div class="attempt-meta" style="margin-top:0.3rem">
+        <span class="badge badge-{{ scenario.difficulty }}">{{ scenario.difficulty }}</span>
+        <span>{{ trainee.name }}</span>
+        {% if attempt.status == 'graded' %}
+          <span class="badge badge-solved">Graded</span>
+        {% elif attempt.status == 'submitted' %}
+          <span class="badge badge-open">Grading…</span>
+        {% else %}
+          <span class="badge badge-open">In progress</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Conversation thread -->
+    <div class="thread">
+      {% for msg in messages %}
+      <div>
+        <div class="msg-label">
+          {% if msg.sender == 'customer' %}{{ scenario.customer.name }} (Customer){% else %}{{ trainee.name }} (You){% endif %}
+        </div>
+        <div class="msg msg-{{ msg.sender }}">{{ msg.content }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Reply form (only when in progress) -->
+    {% if attempt.status == 'in_progress' %}
+    <div class="reply-section">
+      <form method="POST" action="/attempt/{{ attempt.id }}/reply">
+        <div class="form-group">
+          <label for="body">Your reply</label>
+          <textarea id="body" name="body" placeholder="Ask a diagnostic question or provide information…" autofocus></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Reply</button>
+      </form>
+    </div>
+
+    <!-- Submit section -->
+    <div class="submit-section">
+      <h3>Ready to close this ticket?</h3>
+      <p class="text-muted" style="margin-bottom:0.75rem;font-size:0.85rem">
+        Choose Resolve if you have a clear fix to give the customer.
+        Choose Escalate if this requires engineering involvement.
+      </p>
+      <div class="submit-buttons">
+        <button class="btn btn-success" onclick="showSubmit('resolve')">✓ Resolve</button>
+        <button class="btn btn-danger"  onclick="showSubmit('escalate')">↑ Escalate</button>
+      </div>
+
+      <div id="form-resolve" class="submit-form">
+        <form method="POST" action="/attempt/{{ attempt.id }}/submit">
+          <input type="hidden" name="action" value="resolve">
+          <label class="form-label">Resolution note — explain the root cause and steps for the customer</label>
+          <textarea name="final_note" placeholder="Describe what caused the issue and what the customer should do to fix it…"></textarea>
+          <button type="submit" class="btn btn-success">Submit Resolution</button>
+          <button type="button" class="btn btn-ghost" style="margin-left:0.5rem" onclick="hideSubmit()">Cancel</button>
+        </form>
+      </div>
+
+      <div id="form-escalate" class="submit-form">
+        <form method="POST" action="/attempt/{{ attempt.id }}/submit">
+          <input type="hidden" name="action" value="escalate">
+          <label class="form-label">Escalation note — document all findings and why L1/Engineering must take over</label>
+          <textarea name="final_note" placeholder="Summarise your investigation, evidence gathered, and why this requires escalation…"></textarea>
+          <button type="submit" class="btn btn-danger">Submit Escalation</button>
+          <button type="button" class="btn btn-ghost" style="margin-left:0.5rem" onclick="hideSubmit()">Cancel</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Grading banner (submitted, not yet graded) -->
+    {% if attempt.status == 'submitted' %}
+    <div class="grading-banner">
+      <span class="spinner"></span>
+      <span>Grading your response — this takes about 5–10 seconds. The page will refresh automatically.</span>
+    </div>
+    {% endif %}
+
+    <!-- Grade failed notice -->
+    {% if attempt.status == 'grade_failed' %}
+    <div class="alert alert-error" style="margin-top:1.5rem">
+      Grading failed. Check AI settings at <a href="/settings">/settings</a> and contact your administrator.
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────── -->
+  <div>
+    <div class="sidebar-card">
+      <h3>Customer</h3>
+      <div class="info-row"><span class="info-label">Name</span><br>{{ scenario.customer.name }}</div>
+      <div class="info-row" style="margin-top:0.4rem"><span class="info-label">Company</span><br>{{ scenario.customer.company }}</div>
+      <div class="info-row" style="margin-top:0.4rem"><span class="info-label">Litmus Edge</span><br>{{ scenario.customer.le_version }}</div>
+    </div>
+
+    {% if scenario.diagnostic_checklist %}
+    <div class="sidebar-card">
+      <h3>Diagnostic Checklist</h3>
+      <ul class="checklist">
+        {% for item in scenario.diagnostic_checklist %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if attempt.status == 'submitted' %}
+<meta http-equiv="refresh" content="3;url=/attempt/{{ attempt.id }}/results">
+{% endif %}
+
+<script>
+function showSubmit(type) {
+  document.getElementById('form-resolve').classList.remove('visible');
+  document.getElementById('form-escalate').classList.remove('visible');
+  document.getElementById('form-' + type).classList.add('visible');
+  document.getElementById('form-' + type).scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+function hideSubmit() {
+  document.getElementById('form-resolve').classList.remove('visible');
+  document.getElementById('form-escalate').classList.remove('visible');
+}
+</script>
+{% endblock %}

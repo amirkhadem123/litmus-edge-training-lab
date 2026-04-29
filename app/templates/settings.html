@@ -131,7 +131,7 @@ input[readonly] {
 <div class="settings-wrap">
   <h1>AI Provider Settings</h1>
   <p class="text-muted" style="margin-bottom:1.5rem">
-    Configure which AI service powers customer simulation and ticket grading.
+    Configure which AI service is used for attempt grading.
     Settings are stored in the database and override environment variables.
   </p>
 
@@ -188,18 +188,11 @@ input[readonly] {
              autocomplete="new-password" />
     </div>
 
-    <!-- Models -->
-    <div class="form-row">
-      <div class="form-group">
-        <label for="chat_model">Chat Model <span class="text-muted">(customer simulation)</span></label>
-        <input type="text" id="chat_model" name="chat_model"
-               value="{{ config.chat_model }}" placeholder="e.g. gpt-4o-mini" />
-      </div>
-      <div class="form-group">
-        <label for="grade_model">Grade Model <span class="text-muted">(ticket grading)</span></label>
-        <input type="text" id="grade_model" name="grade_model"
-               value="{{ config.grade_model }}" placeholder="e.g. gpt-4o-mini" />
-      </div>
+    <!-- Model -->
+    <div class="form-group">
+      <label for="grade_model">Grade Model <span class="text-muted">(AI model used for attempt grading)</span></label>
+      <input type="text" id="grade_model" name="grade_model"
+             value="{{ config.grade_model }}" placeholder="e.g. claude-haiku-4-5-20251001" />
     </div>
 
     <div class="action-row">
@@ -247,8 +240,7 @@ function applyPreset(provider) {
   };
   document.getElementById('api_base_hint').textContent = hints[provider] || '';
 
-  // Update model fields with defaults (only if unchanged from previous default)
-  document.getElementById('chat_model').value  = preset.chat_model;
+  // Update model field with preset default
   document.getElementById('grade_model').value = preset.grade_model;
 }
 

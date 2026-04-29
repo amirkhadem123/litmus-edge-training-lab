@@ -1,0 +1,181 @@
+id: cp-01
+title: "Dashboard data stopped updating — plant floor sensor"
+mode: certificate
+checkpoint: 1
+difficulty: beginner
+expected_action: resolve
+
+customer:
+  name: Sarah Chen
+  company: Riverside Plastics Corp
+  le_version: "4.0.6"
+
+ticket:
+  subject: "Temperature sensor data no longer updating in our dashboard"
+  initial_message: |
+    Hi Support,
+
+    We have a temperature sensor connected to Litmus Edge that feeds our production dashboard.
+    Since around 9 AM this morning, the dashboard values haven't changed at all — the numbers
+    are frozen. We're not sure if the sensor is broken or something happened in Litmus Edge.
+
+    The device is called "PlantFloor-TempSensor1" in Litmus Edge. Everything was working fine
+    yesterday and nothing planned happened this morning that I know of.
+
+    Can you help us figure out what's wrong? Our operators need to see live temperature readings.
+
+    Sarah Chen
+    Operations Manager
+    Riverside Plastics Corp
+
+diagnostic_checklist:
+  - "Ask Sarah to open DeviceHub and check the status of PlantFloor-TempSensor1"
+  - "Ask what status the device is showing (Connected, Stopped, Disconnected)"
+  - "Ask when approximately the data stopped updating and whether any changes were made"
+  - "If device shows Stopped: guide Sarah to click Start to resume data collection"
+  - "After starting: ask Sarah to verify the dashboard values are updating again"
+
+root_cause: |
+  The device "PlantFloor-TempSensor1" was manually stopped in DeviceHub by another team member
+  earlier that morning while they were reviewing the device list. Stopping a device in DeviceHub
+  pauses all tag polling — the device is no longer collecting or publishing data.
+
+  The physical sensor is running normally. The issue is entirely within Litmus Edge: the device
+  has been put into a "Stopped" state, which halts data collection without any alarm or
+  visible notification in the historian/dashboard.
+
+  Fix: navigate to DeviceHub, find the device, click Start. Data collection resumes immediately
+  and dashboard values will begin updating again within one polling cycle.
+
+correct_response_summary: |
+  1. Ask Sarah to open DeviceHub in Litmus Edge
+  2. Locate the device "PlantFloor-TempSensor1" and check its status badge
+  3. Confirm the device shows "Stopped" status
+  4. Ask Sarah (or guide her to ask her admin) to click the Start button on the device
+  5. Confirm that dashboard values resume updating after the device restarts
+
+# ── Scripted customer simulation ─────────────────────────────────────────────
+scripted_replies:
+  - triggers:
+      - "devicehub"
+      - "device hub"
+      - "check the device"
+      - "open devicehub"
+      - "device status"
+      - "status of the device"
+      - "what does it show"
+      - "look at the device"
+    reply: |
+      I've opened DeviceHub. I can see "PlantFloor-TempSensor1" in the list.
+      It's showing a grey badge that says "Stopped". Is that the problem?
+
+  - triggers:
+      - "stopped"
+      - "what does stopped mean"
+      - "why stopped"
+      - "was it stopped"
+      - "start the device"
+      - "start it"
+      - "click start"
+    reply: |
+      Oh, I see the Start button next to it. I've clicked Start. The badge is changing —
+      it now shows "Connected". Does that mean it's working again?
+
+  - triggers:
+      - "dashboard"
+      - "values updating"
+      - "data updating"
+      - "verify"
+      - "check the dashboard"
+      - "is it working"
+      - "temperature values"
+    reply: |
+      Yes! The dashboard is updating now. The temperature values are changing in real time.
+      Everything looks normal. That was quick — thank you so much!
+
+  - triggers:
+      - "when"
+      - "who stopped it"
+      - "what happened"
+      - "any changes"
+      - "this morning"
+      - "did anyone"
+    reply: |
+      I checked with my colleague — he was reviewing the DeviceHub device list this morning
+      and must have accidentally clicked the Stop button. He didn't realize it would halt
+      data collection. We didn't connect that to the dashboard issue.
+
+  - triggers:
+      - "other device"
+      - "other sensors"
+      - "anything else"
+      - "other affected"
+    reply: |
+      The other devices seem to be fine. Only PlantFloor-TempSensor1 is showing the
+      stopped status. The rest of the dashboard is updating normally.
+
+  - triggers:
+      - "physical sensor"
+      - "hardware"
+      - "sensor broken"
+      - "sensor working"
+      - "the sensor itself"
+    reply: |
+      The physical sensor on the plant floor looks fine — the control panel shows normal
+      readings. It doesn't appear to be a hardware issue.
+
+  - triggers:
+      - "log"
+      - "error"
+      - "device log"
+      - "any errors"
+    reply: |
+      I've looked at the device log. I don't see any errors — just a message that says
+      the device was stopped at 8:52 AM. Nothing about failures or connection issues.
+
+  - triggers:
+      - "tag"
+      - "which tags"
+      - "all tags affected"
+    reply: |
+      All the tags from that device are frozen — temperature zone 1, zone 2, and zone 3 all
+      stopped updating at the same time this morning.
+
+fallback_reply: |
+  I'm not very familiar with the technical side of this — could you walk me through it
+  step by step? I'm happy to follow your instructions in Litmus Edge.
+
+grading_rubric:
+  pass_threshold: 70
+  dimensions:
+    - name: Proactive first response
+      max_points: 40
+      description: |
+        Did the trainee immediately direct the customer to DeviceHub to check the device
+        status rather than jumping to hardware or network assumptions? Award full points
+        for a structured first response that asks Sarah to check the device state in
+        DeviceHub. Award 20 pts for asking about DeviceHub but also suggesting hardware
+        issues in the same breath. Award 0 pts for recommending physical inspection,
+        network diagnostics, or contacting IT as the first step.
+
+    - name: Symptom extraction
+      max_points: 35
+      description: |
+        Did the trainee gather enough information to identify the problem? Award full points
+        for asking about: (1) device status in DeviceHub, (2) when the issue started, and
+        (3) any recent changes or activities. Award 20 pts for checking device status but
+        not asking about timing or changes. Award 10 pts for only asking general questions
+        without directing Sarah to check DeviceHub specifically.
+
+    - name: Resolution accuracy
+      max_points: 25
+      description: |
+        Were the resolution steps correct? Full points for: check device status in DeviceHub →
+        identify Stopped state → start the device → verify data resumes. Deduct 10 pts for
+        recommending a restart of the LE server rather than just the device. Deduct 5 pts
+        for skipping the verification step.
+
+  critical_penalties:
+    - condition: wrong_direction
+      cap: cap_at_50
+      applies_to_checkpoints: []

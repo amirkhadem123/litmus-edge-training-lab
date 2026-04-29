@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Admin — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+.admin-wrap h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2c2318;
+  margin-bottom: 0.3rem;
+}
+
+.trainee-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-bottom: 2rem;
+}
+.trainee-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a7e72;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #d8d0c0;
+}
+.trainee-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #ede8df;
+  color: #2c2318;
+  vertical-align: top;
+}
+.trainee-table tr:last-child td { border-bottom: none; }
+.trainee-table tr:hover td { background: #f5f0e8; }
+
+.cp-status-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.cp-chip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cp-chip.passed            { background: #d4edda; color: #1e4a28; }
+.cp-chip.failed_no_reattempt { background: #f5ddd0; color: #7c3d20; }
+.cp-chip.failed_reattempt_available { background: #fdecd0; color: #7c4e10; }
+.cp-chip.available         { background: #d4e4f0; color: #2a5478; }
+.cp-chip.locked            { background: #e0dbd2; color: #7a6e62; }
+
+.attempt-list { list-style: none; padding: 0; margin: 0; }
+.attempt-list li {
+  font-size: 0.78rem;
+  color: #4a3e32;
+  padding: 0.2rem 0;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.attempt-list a { font-size: 0.78rem; }
+{% endblock %}
+
+{% block content %}
+<div class="admin-wrap">
+  <h1>Admin View</h1>
+  <p class="text-muted" style="margin-bottom:1.5rem">
+    Read-only. {{ trainees | length }} trainee(s) registered.
+  </p>
+
+  {% if not trainees %}
+  <p class="text-muted">No trainees yet.</p>
+  {% else %}
+  <table class="trainee-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Registered</th>
+        <th>Checkpoint Progress</th>
+        <th>Recent Attempts</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trainees %}
+      <tr>
+        <td style="color:#8a7e72;font-family:monospace">{{ t.id }}</td>
+        <td style="font-weight:600">{{ t.name }}</td>
+        <td style="color:#7a6e62;white-space:nowrap">{{ t.created_at[:10] }}</td>
+        <td>
+          <div class="cp-status-row">
+            {% for cp_num in [1, 2, 3] %}
+            {% set cp = t.cp_progress.get(cp_num, {}) %}
+            <span class="cp-chip {{ cp.get('status', 'locked') }}">
+              CP{{ cp_num }}
+              {% if cp.get('status') == 'passed' %}✓{% elif cp.get('status') == 'locked' or not cp %}🔒{% endif %}
+              {% if cp.get('best_score') is not none %} {{ cp.get('best_score') }}{% endif %}
+            </span>
+            {% endfor %}
+          </div>
+        </td>
+        <td>
+          <ul class="attempt-list">
+            {% for a in t.attempts[:5] %}
+            <li>
+              <span class="badge badge-{{ 'solved' if a.status == 'graded' else 'open' }}" style="font-size:0.65rem">{{ a.status }}</span>
+              <a href="/admin/attempt/{{ a.id }}">{{ a.scenario_id }} #{{ a.attempt_number }}</a>
+              <span style="color:#8a7e72">{{ a.mode }}</span>
+            </li>
+            {% endfor %}
+            {% if not t.attempts %}
+            <li style="color:#8a7e72">No attempts</li>
+            {% endif %}
+          </ul>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

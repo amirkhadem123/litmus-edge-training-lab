@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block title %}Results — Litmus Lab{% endblock %}
+
+{% block extra_styles %}
+.results-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 800px) { .results-layout { grid-template-columns: 1fr; } }
+
+/* ── Polling state ───────────────────────────────────────────── */
+.grading-banner {
+  background: #fdf5e0;
+  border: 1px solid #c8a040;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #6a4e10;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Grade card ──────────────────────────────────────────────── */
+.grade-card {
+  background: #ede8df;
+  border: 1px solid #c8bfaf;
+  border-radius: 12px;
+  padding: 1.5rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.grade-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.grade-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9c6b2e;
+  margin-bottom: 0.25rem;
+}
+.grade-scenario { font-size: 1rem; font-weight: 700; color: #2c2318; }
+
+.score-block { text-align: right; }
+.score-number {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #2c2318;
+}
+.score-number.passed { color: #2a5c38; }
+.score-number.failed { color: #7c1e1e; }
+.score-label {
+  font-size: 0.8rem;
+  color: #7a6e62;
+  margin-top: 0.15rem;
+}
+.pass-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 0.35rem;
+}
+.pass-badge.passed { background: #d4edda; color: #1e4a28; }
+.pass-badge.failed { background: #f8ddd8; color: #6c1e1e; }
+
+/* ── Direction row ───────────────────────────────────────────── */
+.direction-row {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #d8d0c0;
+  border-bottom: 1px solid #d8d0c0;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+}
+.direction-row .dir-item { color: #4a3e32; }
+.direction-row .dir-label { color: #7a6e62; font-size: 0.75rem; display: block; }
+
+/* ── Dimension table ─────────────────────────────────────────── */
+.dim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+.dim-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a7e72;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #c8bfaf;
+}
+.dim-table td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid #ddd5c5;
+  vertical-align: middle;
+}
+.dim-table tr:last-child td { border-bottom: none; }
+.dim-score { font-weight: 700; color: #2c2318; }
+.dim-bar-wrap {
+  width: 80px;
+  height: 6px;
+  background: #d8d0c0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dim-bar { height: 100%; border-radius: 3px; background: #7a5230; }
+
+/* ── Feedback sections ───────────────────────────────────────── */
+.feedback-section { margin-bottom: 1.5rem; }
+.feedback-section h3 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #8a7e72;
+  margin-bottom: 0.75rem;
+}
+.dim-feedback-block {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  background: #fdf8f0;
+  border-radius: 8px;
+  border-left: 3px solid #9c6b2e;
+}
+.dim-feedback-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5a3e22;
+  margin-bottom: 0.3rem;
+}
+.dim-feedback-text { font-size: 0.875rem; color: #2c2318; line-height: 1.6; }
+
+.overall-feedback {
+  padding: 1rem 1.1rem;
+  background: #fdf8f0;
+  border-radius: 8px;
+  border-left: 3px solid #4a7a4e;
+  font-size: 0.9rem;
+  color: #2c2318;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+.sidebar-card {
+  background: #ede8df;
+  border: 1px solid #c8bfaf;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.sidebar-card h3 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #8a7e72;
+  margin-bottom: 0.7rem;
+}
+.sidebar-card .info-row { font-size: 0.85rem; color: #2c2318; margin-bottom: 0.3rem; }
+.sidebar-card .info-label { color: #7a6e62; }
+
+/* ── Thread (compact) ────────────────────────────────────────── */
+.thread-compact { margin-top: 1.5rem; }
+.thread-compact h3 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #8a7e72;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #d8d0c0;
+}
+.msg-compact {
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+  white-space: pre-wrap;
+}
+.msg-compact.customer { background: #e8f0f5; border-left: 3px solid #4a82a8; }
+.msg-compact.trainee  { background: #edf5ee; border-left: 3px solid #4a7a4e; }
+.msg-sender { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #7a6e62; margin-bottom: 0.2rem; }
+{% endblock %}
+
+{% block content %}
+
+{% if attempt.status == 'submitted' %}
+<!-- ── Still grading ─────────────────────────────────────────── -->
+<div class="grading-banner">
+  <span class="spinner"></span>
+  <span>Grading your response — this takes about 5–10 seconds. The page will refresh automatically.</span>
+</div>
+<a href="/dashboard" class="btn btn-ghost">← Back to Dashboard</a>
+
+{% elif grade %}
+<!-- ── Results ───────────────────────────────────────────────── -->
+<div class="results-layout">
+  <div>
+    <div class="grade-card">
+      <!-- Header -->
+      <div class="grade-header">
+        <div>
+          <div class="grade-title">
+            {% if attempt.checkpoint %}Checkpoint {{ attempt.checkpoint }} Result{% else %}Practice Result{% endif %}
+          </div>
+          <div class="grade-scenario">{{ scenario.title }}</div>
+          <div style="font-size:0.8rem;color:#7a6e62;margin-top:0.2rem">{{ trainee.name }}</div>
+        </div>
+        <div class="score-block">
+          <div class="score-number {% if grade.passed %}passed{% else %}failed{% endif %}">
+            {{ grade.total_score }}
+          </div>
+          <div class="score-label">out of 100</div>
+          <div class="pass-badge {% if grade.passed %}passed{% else %}failed{% endif %}">
+            {% if grade.passed %}✅ Passed{% else %}❌ Not Passed{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Direction -->
+      <div class="direction-row">
+        <div class="dir-item">
+          <span class="dir-label">Expected action</span>
+          {{ grade.expected_action | capitalize }}
+        </div>
+        <div class="dir-item">
+          <span class="dir-label">Your action</span>
+          {{ grade.trainee_action | capitalize }}
+        </div>
+        <div class="dir-item">
+          <span class="dir-label">Direction</span>
+          {% if grade.correct_direction %}✅ Correct{% else %}❌ Wrong — penalty applied{% endif %}
+        </div>
+      </div>
+
+      <!-- Dimension scores table -->
+      {% if grade.dimension_scores %}
+      <table class="dim-table">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Score</th>
+            <th>Max</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in grade.dimension_scores %}
+          <tr>
+            <td>{{ d.name }}</td>
+            <td class="dim-score">{{ d.score }}</td>
+            <td style="color:#7a6e62">{{ d.max_points }}</td>
+            <td>
+              <div class="dim-bar-wrap">
+                <div class="dim-bar" style="width:{{ [(d.score / d.max_points * 100), 100] | min }}%"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+
+    <!-- Feedback by dimension -->
+    {% if grade.dimension_scores %}
+    <div class="feedback-section">
+      <h3>Feedback by Dimension</h3>
+      {% for d in grade.dimension_scores %}
+      <div class="dim-feedback-block">
+        <div class="dim-feedback-name">{{ d.name }} — {{ d.score }}/{{ d.max_points }}</div>
+        <div class="dim-feedback-text">{{ d.feedback }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Overall feedback -->
+    <div class="feedback-section">
+      <h3>Overall Feedback</h3>
+      <div class="overall-feedback">{{ grade.overall_feedback }}</div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:0.75rem;margin-top:1.5rem;flex-wrap:wrap">
+      <a href="/dashboard" class="btn btn-primary">← Back to Dashboard</a>
+      {% if not grade.passed and attempt.checkpoint %}
+        {% set cp_num = attempt.checkpoint %}
+        <a href="/attempt/{{ scenario.id }}/new" class="btn btn-warning">Try Again</a>
+      {% endif %}
+    </div>
+
+    <!-- Conversation thread (collapsed reference) -->
+    <div class="thread-compact">
+      <h3>Conversation Transcript</h3>
+      {% for msg in messages %}
+      <div>
+        <div class="msg-sender">
+          {% if msg.sender == 'customer' %}{{ scenario.customer.name }} (Customer){% else %}{{ trainee.name }} (You){% endif %}
+        </div>
+        <div class="msg-compact {{ msg.sender }}">{{ msg.content }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Sidebar ────────────────────────────────────────────────── -->
+  <div>
+    <div class="sidebar-card">
+      <h3>Customer</h3>
+      <div class="info-row"><span class="info-label">Name</span><br>{{ scenario.customer.name }}</div>
+      <div class="info-row" style="margin-top:0.4rem"><span class="info-label">Company</span><br>{{ scenario.customer.company }}</div>
+      <div class="info-row" style="margin-top:0.4rem"><span class="info-label">Litmus Edge</span><br>{{ scenario.customer.le_version }}</div>
+    </div>
+    <div class="sidebar-card">
+      <h3>Attempt info</h3>
+      <div class="info-row"><span class="info-label">Mode</span><br>{{ attempt.mode | capitalize }}</div>
+      {% if attempt.checkpoint %}<div class="info-row" style="margin-top:0.4rem"><span class="info-label">Checkpoint</span><br>{{ attempt.checkpoint }}</div>{% endif %}
+      <div class="info-row" style="margin-top:0.4rem"><span class="info-label">Attempt #</span><br>{{ attempt.attempt_number }}</div>
+      <div class="info-row" style="margin-top:0.4rem"><span class="info-label">Pass threshold</span><br>70/100</div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- ── Grade failed / unexpected state ───────────────────────── -->
+<div class="alert alert-error">
+  Grading is not available for this attempt.
+  {% if attempt.status == 'grade_failed' %}
+  Check AI settings at <a href="/settings">/settings</a>.
+  {% endif %}
+</div>
+<a href="/dashboard" class="btn btn-ghost" style="margin-top:1rem">← Back to Dashboard</a>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if attempt.status == 'submitted' %}
+<script>
+  // Poll every 3 seconds until graded
+  setTimeout(() => location.reload(), 3000);
+</script>
+{% endif %}
+{% endblock %}

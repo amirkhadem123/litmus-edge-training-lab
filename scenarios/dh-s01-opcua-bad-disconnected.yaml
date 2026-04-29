@@ -1,5 +1,6 @@
 id: dh-s01
 title: OPC UA tags stuck at Bad:Disconnected despite device showing Connected
+mode: practice
 difficulty: intermediate
 expected_action: resolve
 
@@ -31,89 +32,179 @@ ticket:
     Controls Systems Engineer
     Steinberg Precision Components
 
-  attachments: []
-
 diagnostic_checklist:
-  - "Ask the customer to check the device log in DeviceHub — look for any recurring error messages"
+  - "Ask Marcus to open the device log in DeviceHub — look for any recurring error messages"
   - "Ask whether any tags were recently added, removed, or modified (especially manually)"
-  - "Find out exactly when the issue started and whether any configuration changes were made around that time"
-  - "Confirm whether ALL tags are affected or only some — ask the customer to check a few specific ones"
-  - "Ask the customer to check the OPC UA server (Kepware) browser — verify the node paths are still valid"
+  - "Find out exactly when the issue started and whether any changes were made around that time"
+  - "Confirm whether ALL tags are affected or only some — ask Marcus to check a few specific ones"
+  - "Ask to verify whether the OPC UA node paths in the problematic tags still exist on Kepware"
 
 root_cause: |
-  A technician manually added several tags to the CNC-Line3-OPC device in DeviceHub last week.
+  A technician manually added several tags to the CNC-Line3-OPC device last week.
   These tags were entered with incorrect OPC UA node IDs (e.g., ns=2;s=CNC_Line3.Spindle.BadRegister)
   that do not exist on the Kepware OPC UA server.
 
   Litmus Edge's OPC UA driver creates monitored items for all tags on the device. When it attempts
   to subscribe to the invalid node IDs, the OPC UA server returns BadNodeIdUnknown errors. The driver
-  floods with these subscription failures, eventually overwhelming its internal state and causing it
-  to drop the monitored item subscriptions for ALL tags on the device — including the valid ones.
-  The device appears "Connected" at the TCP/session level, but the tag subscriptions are broken.
+  floods with subscription failures, eventually overwhelming its internal state and dropping the
+  monitored item subscriptions for ALL tags — including the valid ones. The device appears
+  "Connected" at the TCP/session level but the tag subscriptions are broken.
 
-  Restarting the device clears the subscription state momentarily, but the driver immediately
-  re-subscribes to all tags (including the bad ones) and the cycle repeats within minutes.
+  Restarting clears the subscription state momentarily, but the driver immediately re-subscribes
+  to all tags (including the bad ones) and the cycle repeats within minutes.
 
-  Fix: identify and delete the tags with invalid node IDs. Once removed, restart the device.
-  The driver will re-subscribe only to valid nodes and all remaining tags will return to Good quality.
+  Fix: identify and delete the tags with invalid node IDs, then restart the device.
 
 correct_response_summary: |
-  1. Ask the customer to open the device in DeviceHub and navigate to the device logs/event stream
+  1. Ask Marcus to open the device in DeviceHub and navigate to the device logs
   2. Look for repeated errors containing "BadNodeIdUnknown" — note the node IDs mentioned
-  3. Cross-reference those node IDs against the tag list — find the tags with those node paths
-  4. Delete the invalid tags (the ones with node IDs that return BadNodeIdUnknown)
+  3. Cross-reference those node IDs against the tag list to find the tags with bad node paths
+  4. Delete the invalid tags (the ones with node IDs returning BadNodeIdUnknown)
   5. Restart the device in DeviceHub (Stop → Start)
-  6. Verify that remaining tags return to "Good" quality status and data resumes in the historian
+  6. Verify remaining tags return to "Good" quality and data resumes in the historian
 
-grading_rubric: |
-  CRITICAL (50 pts): Did the trainee identify that the root cause is invalid/bad node IDs on
-  some tags causing OPC UA subscription failures? Look for mentions of: BadNodeIdUnknown,
-  invalid node IDs, bad tag configuration, manually added tags with wrong node paths.
-  Award 0 pts for this section if the trainee blames the OPC UA server, network connectivity,
-  or restarts the device as the primary fix without investigating tag configuration.
-
-  DIAGNOSTIC QUALITY (25 pts): Did the trainee ask the customer to check the device logs?
-  Did they ask about recent configuration changes or manually added tags? Award full points if
-  they systematically guided the customer to find the error in the logs and connect it to
-  recently added tags. Award partial (10–15 pts) if they directed the customer to logs but
-  didn't pursue the tag angle.
-
-  RESOLUTION STEPS (15 pts): Were the resolution steps accurate and complete? Full points for:
-  identify and delete invalid tags → restart device → verify data resumes. Deduct 5 pts if
-  they omitted the verification step. Deduct 10 pts if restart-only is the recommended fix
-  without addressing the bad tags.
-
-  COMMUNICATION (10 pts): Was the response professional, clear, and appropriately scoped for
-  a controls systems engineer (moderately technical)? Did they acknowledge the production impact?
-
-  CRITICAL PENALTY: If the trainee escalated this ticket (checked the Escalation box), deduct
-  40 pts — this is a straightforward L0-fixable configuration issue.
-
-# ── AI customer simulation context ──────────────────────────────────────────
-customer_ai_context:
-  knows: |
-    - CNC-Line3-OPC shows "Connected" status in DeviceHub
-    - Almost all tags show "Bad:Disconnected" quality — no data in the historian
-    - The problem started about 3–4 days ago
-    - Restarting the device in DeviceHub temporarily fixes it (tags come back for ~10–15 minutes), then fails again
-    - The Kepware OPC UA server is working fine — other OPC UA clients (e.g., SCADA system) are reading from it without issues
-    - A technician was doing some tag configuration work in Litmus Edge last week — specifically, they were adding some new tags manually to expand monitoring coverage
-    - The device log (if asked to look) shows repeated lines like:
+# ── Scripted customer simulation ─────────────────────────────────────────────
+scripted_replies:
+  - triggers:
+      - "log"
+      - "event log"
+      - "device log"
+      - "error message"
+      - "any errors"
+      - "check the log"
+    reply: |
+      I've opened the device log. There are a lot of repeated lines — they appear every few seconds:
       "Create monitored item 'ns=2;s=CNC_Line3.Spindle.BadRegister' failed: BadNodeIdUnknown"
       "Create monitored item 'ns=2;s=CNC_Line3.Aux.TestPoint99' failed: BadNodeIdUnknown"
-      These repeat every few seconds.
-    - There are about 4–5 tags in the list with unusual names (BadRegister, TestPoint99, DebugChannel1, etc.) that the regular operators don't recognize — they look like test tags someone added
-  does_not_know: |
-    - That the manually-added tags have incorrect OPC UA node IDs
-    - What "BadNodeIdUnknown" means technically
-    - That invalid tags can cause ALL tag subscriptions to fail (not just the bad ones)
-    - How to identify which tags are causing the problem just by looking at the tag list
-    - That deleting the bad tags (not restarting) is the permanent fix
-  behavior: |
-    - Moderately technical — can navigate DeviceHub when given step-by-step directions
-    - Speaks like a controls engineer: understands PLC terminology, familiar with OPC UA concepts in general terms, but not a Litmus Edge expert
-    - Frustrated that restarts only provide temporary relief — has already tried restarting several times
-    - Will navigate to the device logs when asked and read out what he sees (including the BadNodeIdUnknown errors)
-    - If asked about recent changes, will mention the technician's tag addition work last week after a moment's thought
-    - Will confirm tag names if asked to look at the tag list — can describe the "unusual" test-looking tag names
-    - Keep responses concise: 2–4 sentences. Don't volunteer information unless directly asked.
+      There are a couple more with similar patterns. They keep repeating continuously.
+
+  - triggers:
+      - "recently add"
+      - "recently chang"
+      - "configuration change"
+      - "any change"
+      - "what changed"
+      - "when did it start"
+      - "around the same time"
+      - "last week"
+    reply: |
+      Now that you mention it — one of our technicians was adding new tags to the device last week
+      to expand our monitoring coverage. The problem started a day or two after that. I didn't
+      connect those two things until now.
+
+  - triggers:
+      - "tag list"
+      - "which tags"
+      - "look at the tags"
+      - "unusual tag"
+      - "test tag"
+      - "list of tags"
+    reply: |
+      Looking at the tag list... most of them look normal — spindle speed, feed rate, temperatures.
+      But there are four or five with odd names: BadRegister, TestPoint99, DebugChannel1, AuxMonitor2.
+      Those don't match anything our operators would normally monitor.
+
+  - triggers:
+      - "node id"
+      - "node path"
+      - "ns="
+      - "node address"
+    reply: |
+      I can see the node IDs for those unusual tags. They look different from the others —
+      the paths like "ns=2;s=CNC_Line3.Spindle.BadRegister" don't match anything I recognize
+      in our Kepware configuration.
+
+  - triggers:
+      - "kepware"
+      - "opc server"
+      - "other client"
+      - "other system"
+      - "scada"
+      - "server is fine"
+    reply: |
+      Yes, our SCADA system and a few other OPC UA clients are all reading from Kepware without
+      any issues. The Kepware server itself is definitely running and responding normally.
+
+  - triggers:
+      - "restart"
+      - "restarted"
+      - "reboot"
+      - "stop and start"
+      - "tried restart"
+    reply: |
+      Yes, I've restarted the device several times. It does bring the data back — but only
+      for about 10 to 15 minutes before it drops to Bad:Disconnected again.
+
+  - triggers:
+      - "all tags"
+      - "how many tags"
+      - "every tag"
+      - "all affected"
+    reply: |
+      Almost all of them — we have around 40 tags on that device and maybe 35 or 36 are
+      showing Bad:Disconnected. A couple seem to be intermittently OK but most are stuck.
+
+  - triggers:
+      - "delete"
+      - "remove the tag"
+      - "remove those tags"
+      - "get rid of"
+    reply: |
+      I've deleted those four tags with the unusual names. Should I restart the device now?
+
+  - triggers:
+      - "start the device"
+      - "start it"
+      - "restart now"
+      - "restart the device"
+      - "after deleting"
+    reply: |
+      Done — I stopped and restarted the device. The tags are coming back up and they're
+      showing "Good" quality now. Data is flowing into the historian again. Looks like that fixed it!
+
+  - triggers:
+      - "verify"
+      - "confirm"
+      - "check now"
+      - "is it working"
+      - "data flowing"
+      - "good quality"
+    reply: |
+      Yes — all the remaining tags are showing "Good" quality and the values are updating
+      in real time. The historian is receiving data again. Thank you!
+
+fallback_reply: |
+  I'm not sure I follow — could you be more specific about what you need me to check or do?
+
+grading_rubric:
+  pass_threshold: 70
+  dimensions:
+    - name: Root cause identification
+      max_points: 40
+      description: |
+        Did the trainee identify that invalid OPC UA node IDs on manually-added tags are causing
+        BadNodeIdUnknown errors, which in turn break subscriptions for ALL tags? Award full points
+        for clearly connecting the bad node IDs to the subscription failure cascade. Award 20 pts
+        if they identified bad tags but not why they affect all subscriptions. Award 0 pts if they
+        blamed the OPC UA server, network, or recommended restart as the permanent fix.
+
+    - name: Diagnostic quality
+      max_points: 35
+      description: |
+        Did the trainee systematically guide Marcus to find the evidence? Award full points for:
+        asking about device logs AND asking about recent configuration changes AND connecting the
+        technician's tag additions to the log errors. Award 20 pts for checking logs but not asking
+        about changes. Award 10 pts for identifying the bad tags without going through the diagnostic
+        steps (guessing the answer).
+
+    - name: Resolution accuracy
+      max_points: 25
+      description: |
+        Were the resolution steps correct and complete? Full points for: delete bad tags → restart
+        device → verify data resumes. Deduct 10 pts for recommending restart without tag deletion.
+        Deduct 5 pts for skipping the verification step.
+
+  critical_penalties:
+    - condition: wrong_direction
+      cap: cap_at_50
+      applies_to_checkpoints: []
