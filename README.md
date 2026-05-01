@@ -7,7 +7,8 @@ feedback. No trainer required. No live Litmus Edge instance needed.
 
 > **v2 (this branch)** replaces the trainer-led ticket workflow with a fully
 > autonomous, self-paced certificate program structured around three graded
-> checkpoints.
+> checkpoints. Designed to run on a shared internal server accessible over VPN —
+> multiple users can log in simultaneously with their own accounts and AI settings.
 
 ---
 
@@ -33,9 +34,9 @@ feedback. No trainer required. No live Litmus Edge instance needed.
 
 ```
 Trainee visits the app
-  → Enters their name → dashboard shown
+  → Registers with name + email + password (or signs in if they have an account)
+  → Dashboard shown: certificate checkpoints + practice scenarios
   → Certificate checkpoints (CP1 → CP2 → CP3) unlock sequentially on pass
-  → Practice scenarios always available
 
 Trainee begins a checkpoint or practice attempt
   → Customer's opening support ticket displayed
@@ -113,11 +114,12 @@ litmus-lab/
 │   ├── grader.py        ← Dimensional grading, penalty enforcement
 │   └── templates/
 │       ├── base.html           ← Shared layout (sepia theme)
-│       ├── start.html          ← Trainee name entry page
+│       ├── login.html          ← Sign-in page (email + password)
+│       ├── register.html       ← Account creation page
 │       ├── dashboard.html      ← Checkpoint cards + practice table
 │       ├── attempt.html        ← Live ticket conversation view
 │       ├── results.html        ← Grade breakdown page
-│       ├── settings.html       ← AI provider configuration
+│       ├── settings.html       ← Per-user AI provider configuration
 │       ├── admin.html          ← Admin: all trainees + progress (password-protected)
 │       └── admin_attempt.html  ← Admin: individual attempt detail
 │
@@ -154,14 +156,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Open `http://localhost:8000` and go to `/settings` to configure your AI provider.
+Open `http://localhost:8000`. You'll be taken to the login page. Create an account,
+then go to `/settings` to configure your AI provider before running graded checkpoints.
 
-The app starts without any `.env` file. AI settings are configured through the
-web UI at `/settings` and stored in the SQLite database.
+### 3. (Optional) Pre-configure a shared AI key
 
-### 3. (Optional) Seed environment variables
-
-If you prefer environment variables over the UI, copy `.env.example`:
+If you want all users to inherit a company-wide API key without configuring their own,
+copy `.env.example` and fill it in:
 
 ```bash
 cp .env.example .env
@@ -175,12 +176,12 @@ LITMUS_API_KEY=sk-ant-...
 LITMUS_GRADE_MODEL=claude-haiku-4-5-20251001
 ```
 
-Environment variables serve as defaults; settings saved through the UI take
-precedence.
+Environment variables serve as fallback defaults. Settings saved through a user's
+own `/settings` page take precedence and are private to that account.
 
 ### 4. Fresh start
 
-To reset all trainee progress, delete the database file:
+To reset all trainee data, delete the database file:
 
 ```bash
 rm litmus_lab.db
@@ -196,7 +197,8 @@ The app recreates the schema automatically on next startup.
 
 ```bash
 cp .env.example .env
-# Fill in LITMUS_API_BASE and LITMUS_API_KEY in .env
+# Fill in LITMUS_API_BASE and LITMUS_API_KEY in .env (optional — users can configure their own)
+# Set LITMUS_ADMIN_PASSWORD to a strong secret
 
 docker compose up -d --build
 ```
@@ -221,15 +223,38 @@ git pull
 docker compose up -d --build
 ```
 
-Data is preserved. No migration needed — the schema is recreated from scratch
-only if the database file doesn't exist.
+Data is preserved across updates. Schema migrations run automatically on startup.
 
 ### 4. Admin access
 
 Visit `http://your-server/admin?pw=YOUR_ADMIN_PASSWORD`.
 
 Set the password via the `LITMUS_ADMIN_PASSWORD` environment variable. If the
-variable is not set, the admin page is inaccessible.
+variable is not set, the admin page returns 403 for all requests.
+
+---
+
+## User Accounts
+
+### Registration
+
+Trainees self-register at `GET /register` with:
+- **Display name** — shown on the dashboard and in grading output
+- **Email address** — used as the login username (case-insensitive, must be unique)
+- **Password** — minimum 8 characters, hashed with bcrypt before storage
+
+### Login
+
+`GET /login` — email + password. A session cookie (`trainee_id`, HttpOnly) is set on
+success and cleared on sign-out.
+
+### Password reset (admin only)
+
+Admins can reset any trainee's password from the admin view:
+`GET /admin?pw=ADMIN_PASSWORD` → find the trainee row → enter a new password in the
+Reset field and submit.
+
+There is no email-based self-service password reset — the admin handles it directly.
 
 ---
 
@@ -362,6 +387,14 @@ When a trainee submits their final note, grading runs in the background:
 Grading is non-deterministic. The written per-dimension feedback is more
 actionable than the numeric score. Treat scores as directional guidance.
 
+### AI key not configured
+
+If a user has no API key configured (and no server-level `LITMUS_API_KEY` env var
+is set), a warning banner is shown on their dashboard. Certificate checkpoints are
+blocked until the user configures their own key at `/settings`. Practice scenarios
+still start — grading will fail with a clear message rather than silently producing
+a bad result.
+
 ---
 
 ## Adding New Scenarios
@@ -382,8 +415,8 @@ with `mode: practice`. No other changes needed — the dashboard picks up all
 
 Good scripted replies follow these principles:
 
-- **Be specific in `knows`** — include exact status text, exact error messages,
-  exact field values. Vagueness forces trainees to guess instead of diagnose.
+- **Be specific** — include exact status text, exact error messages, exact field
+  values. Vagueness forces trainees to guess instead of diagnose.
 - **Order triggers from specific to general** — "device log" before "log" if
   both are defined, so the more specific trigger wins.
 - **Cover all diagnostic paths** — every question a well-trained analyst would
@@ -396,8 +429,13 @@ Good scripted replies follow these principles:
 
 ## AI Provider Configuration
 
-Visit `/settings` in the app to configure the AI provider. Settings are stored
-in the database and override environment variables.
+Visit `/settings` in the app to configure your personal AI provider. Settings are
+stored in the database and are **private to your account** — changing them does not
+affect other users.
+
+If an administrator has set server-level environment variables (`LITMUS_API_KEY`,
+`LITMUS_API_BASE`), those serve as company-wide defaults and new users inherit them
+automatically. A user's own settings always take precedence over the server defaults.
 
 ### Supported providers
 
@@ -426,9 +464,11 @@ are working before running a graded attempt.
 `GET /admin?pw=YOUR_ADMIN_PASSWORD`
 
 Shows:
-- All registered trainees with registration date
+- All registered trainees (name, email, registration date)
 - Checkpoint progress (CP1/CP2/CP3 status + best scores)
 - Last 5 attempts per trainee with links to full conversation + grade breakdown
+- **Password reset** — enter a new password (min 8 chars) in the Reset field next
+  to any trainee and submit to overwrite their password immediately
 
 The admin password is set via the `LITMUS_ADMIN_PASSWORD` environment variable.
 If unset, the admin page returns 403 for all requests.
@@ -448,14 +488,23 @@ If unset, the admin page returns 403 for all requests.
  │                               │
 [SQLite DB (WAL mode)]   [AI Grading API]
   ├─ trainees                (OpenAI-compatible)
+  ├─ trainee_settings
   ├─ attempts
   ├─ messages
   ├─ grades
-  ├─ checkpoint_progress
-  └─ settings
+  └─ checkpoint_progress
 ```
 
 **Key design decisions:**
+
+- **Email + password authentication** — bcrypt-hashed passwords; `email` is the
+  unique login username. Session stored as a plain `trainee_id` HttpOnly cookie
+  after successful login. No JWTs, no session store — stateless after auth.
+
+- **Per-user AI settings** — each user's `provider`, `api_base`, `api_key`, and
+  `grade_model` are stored in `trainee_settings`. Falls back to server env vars
+  so an admin can pre-configure a shared company key that all users inherit until
+  they override it.
 
 - **Scripted customer simulation** — deterministic keyword matching instead of
   generative AI. Every trainee who asks the right question gets the right answer.
@@ -469,8 +518,9 @@ If unset, the admin page returns 403 for all requests.
   response is returned. The results page polls every 3 seconds until grading
   completes.
 
-- **Cookie session** — trainee identity stored as a plain integer `trainee_id`
-  cookie (HttpOnly). No encryption needed — IDs are not security-sensitive.
+- **SQLite with WAL mode** — supports concurrent readers + a single writer. Suitable
+  for an internal team of up to ~30 simultaneous users. No Postgres needed unless
+  the team scales significantly beyond that.
 
 - **Single API endpoint for all providers** — OpenAI SDK with configurable
   `base_url`. Works for Claude via Anthropic's OpenAI-compatible endpoint,
@@ -482,9 +532,15 @@ If unset, the admin page returns 403 for all requests.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LITMUS_API_BASE` | No | — | Base URL of the AI API (overridden by UI setting) |
-| `LITMUS_API_KEY` | No | — | API key (overridden by UI setting) |
-| `LITMUS_GRADE_MODEL` | No | `claude-haiku-4-5-20251001` | Grading model (overridden by UI) |
-| `LITMUS_PROVIDER` | No | `claude` | Provider name (`openwebui`, `claude`, `gemini`) |
+| `LITMUS_ADMIN_PASSWORD` | **Yes** (for admin) | — | Password for `/admin`. No admin access if unset. |
+| `LITMUS_API_BASE` | No | — | Fallback API base URL (overridden by per-user setting) |
+| `LITMUS_API_KEY` | No | — | Fallback API key (overridden by per-user setting) |
+| `LITMUS_GRADE_MODEL` | No | `claude-haiku-4-5-20251001` | Fallback grade model (overridden by per-user setting) |
+| `LITMUS_PROVIDER` | No | `claude` | Fallback provider name (`openwebui`, `claude`, `gemini`) |
 | `LITMUS_DATA_DIR` | No | `.` (project root) | Directory for the SQLite DB file |
-| `LITMUS_ADMIN_PASSWORD` | No | — | Password for `/admin` (no admin access if unset) |
+
+**Fallback chain for AI settings:** user's saved setting → server env var → hardcoded default.
+
+New users automatically inherit whatever is set in the server env vars, so setting
+`LITMUS_API_KEY` and `LITMUS_API_BASE` in `.env` means users can start graded
+checkpoints immediately without configuring anything themselves.
