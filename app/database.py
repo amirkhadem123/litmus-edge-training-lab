@@ -2,12 +2,12 @@
 database.py — SQLite persistence layer for Litmus Lab v2.
 
 Schema:
-  trainees           — one row per trainee (name-based identity)
-  attempts           — one training attempt per scenario per trainee
-  messages           — conversation thread for each attempt
-  grades             — dimensional grading result per attempt
+  trainees            — one row per user account (email + password_hash)
+  trainee_settings    — per-user AI provider configuration
+  attempts            — one training attempt per scenario per trainee
+  messages            — conversation thread for each attempt
+  grades              — dimensional grading result per attempt
   checkpoint_progress — denormalised checkpoint status per trainee (fast dashboard reads)
-  settings           — AI provider configuration (key/value)
 
 All functions open and close connections promptly via context managers.
 WAL mode enabled for safe concurrent access.
@@ -18,6 +18,8 @@ import json
 import os
 import sqlite3
 from pathlib import Path
+
+import bcrypt
 
 DB_PATH = Path(os.environ.get("LITMUS_DATA_DIR", ".")) / "litmus_lab.db"
 
@@ -31,18 +33,45 @@ def _connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create tables. Drops legacy v1 tables (tickets, comments) if present."""
+    """Create all tables. Migrates from name-only schema to email+password if needed."""
     with _connect() as conn:
-        # Remove v1 tables — no production data to preserve
+        # Remove legacy v1 tables
         conn.executescript("""
             DROP TABLE IF EXISTS comments;
             DROP TABLE IF EXISTS tickets;
         """)
+
+        # Detect if trainees table needs migration (old schema lacks email column)
+        cursor = conn.execute("PRAGMA table_info(trainees)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if columns and "email" not in columns:
+            # Old name-only schema — drop all tables for a clean slate
+            conn.executescript("""
+                DROP TABLE IF EXISTS checkpoint_progress;
+                DROP TABLE IF EXISTS grades;
+                DROP TABLE IF EXISTS messages;
+                DROP TABLE IF EXISTS attempts;
+                DROP TABLE IF EXISTS trainee_settings;
+                DROP TABLE IF EXISTS trainees;
+            """)
+
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS trainees (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                name       TEXT    NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                name          TEXT    NOT NULL,
+                email         TEXT    NOT NULL,
+                password_hash TEXT    NOT NULL,
+                created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_trainees_email
+                ON trainees(email);
+
+            CREATE TABLE IF NOT EXISTS trainee_settings (
+                trainee_id  INTEGER PRIMARY KEY REFERENCES trainees(id),
+                provider    TEXT NOT NULL DEFAULT 'claude',
+                api_base    TEXT NOT NULL DEFAULT '',
+                api_key     TEXT NOT NULL DEFAULT '',
+                grade_model TEXT NOT NULL DEFAULT 'claude-haiku-4-5-20251001'
             );
 
             CREATE TABLE IF NOT EXISTS attempts (
@@ -93,27 +122,36 @@ def init_db() -> None:
                 updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(trainee_id, checkpoint)
             );
-
-            CREATE TABLE IF NOT EXISTS settings (
-                key   TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
         """)
 
 
-# ── Trainee operations ────────────────────────────────────────────────────────
+# ── Trainee auth operations ────────────────────────────────────────────────────
 
-def get_trainee_by_name(name: str) -> dict | None:
+def hash_password(plaintext: str) -> str:
+    return bcrypt.hashpw(plaintext.encode(), bcrypt.gensalt()).decode()
+
+
+def check_password(plaintext: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plaintext.encode(), hashed.encode())
+    except Exception:
+        return False
+
+
+def get_trainee_by_email(email: str) -> dict | None:
     with _connect() as conn:
         row = conn.execute(
-            "SELECT * FROM trainees WHERE LOWER(name) = LOWER(?)", (name,)
+            "SELECT * FROM trainees WHERE LOWER(email) = LOWER(?)", (email.strip(),)
         ).fetchone()
         return dict(row) if row else None
 
 
-def create_trainee(name: str) -> int:
+def create_trainee(name: str, email: str, password_hash: str) -> int:
     with _connect() as conn:
-        cur = conn.execute("INSERT INTO trainees (name) VALUES (?)", (name,))
+        cur = conn.execute(
+            "INSERT INTO trainees (name, email, password_hash) VALUES (?, ?, ?)",
+            (name.strip(), email.strip().lower(), password_hash),
+        )
         return cur.lastrowid
 
 
@@ -131,6 +169,65 @@ def get_all_trainees() -> list[dict]:
             "SELECT * FROM trainees ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def admin_reset_password(trainee_id: int, new_password_hash: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE trainees SET password_hash = ? WHERE id = ?",
+            (new_password_hash, trainee_id),
+        )
+
+
+# ── Per-user AI settings ──────────────────────────────────────────────────────
+
+def init_trainee_settings(trainee_id: int) -> None:
+    """Insert default settings row. Pre-populate from server env vars if set."""
+    provider    = os.environ.get("LITMUS_PROVIDER", "claude")
+    api_base    = os.environ.get("LITMUS_API_BASE", "")
+    api_key     = os.environ.get("LITMUS_API_KEY", "")
+    grade_model = os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001")
+    with _connect() as conn:
+        conn.execute(
+            """INSERT OR IGNORE INTO trainee_settings
+               (trainee_id, provider, api_base, api_key, grade_model)
+               VALUES (?, ?, ?, ?, ?)""",
+            (trainee_id, provider, api_base, api_key, grade_model),
+        )
+
+
+def get_trainee_settings(trainee_id: int) -> dict:
+    """Return the trainee's AI settings, falling back to env-var defaults."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM trainee_settings WHERE trainee_id = ?", (trainee_id,)
+        ).fetchone()
+    if row:
+        return dict(row)
+    # No row yet — return env-var defaults without writing to DB
+    return {
+        "trainee_id":  trainee_id,
+        "provider":    os.environ.get("LITMUS_PROVIDER", "claude"),
+        "api_base":    os.environ.get("LITMUS_API_BASE", ""),
+        "api_key":     os.environ.get("LITMUS_API_KEY", ""),
+        "grade_model": os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001"),
+    }
+
+
+def set_trainee_setting(trainee_id: int, key: str, value: str) -> None:
+    allowed = {"provider", "api_base", "api_key", "grade_model"}
+    if key not in allowed:
+        return
+    with _connect() as conn:
+        # Ensure row exists
+        conn.execute(
+            "INSERT OR IGNORE INTO trainee_settings (trainee_id) VALUES (?)",
+            (trainee_id,),
+        )
+        conn.execute(
+            f"UPDATE trainee_settings SET {key} = ? WHERE trainee_id = ?",
+            (value, trainee_id),
+        )
 
 
 # ── Attempt operations ────────────────────────────────────────────────────────
@@ -161,7 +258,6 @@ def get_attempt(attempt_id: int) -> dict | None:
 
 
 def get_active_attempt(trainee_id: int, scenario_id: str) -> dict | None:
-    """Return an in-progress attempt for this trainee+scenario, or None."""
     with _connect() as conn:
         row = conn.execute(
             """SELECT * FROM attempts
@@ -342,7 +438,6 @@ def update_checkpoint_after_grade(
             (new_status, best_score, attempts_used, trainee_id, checkpoint),
         )
 
-        # Unlock next checkpoint if this one was just passed
         if passed and checkpoint < 3:
             conn.execute(
                 """UPDATE checkpoint_progress
@@ -351,21 +446,3 @@ def update_checkpoint_after_grade(
                    WHERE trainee_id = ? AND checkpoint = ? AND status = 'locked'""",
                 (trainee_id, checkpoint + 1),
             )
-
-
-# ── Settings operations ───────────────────────────────────────────────────────
-
-def get_setting(key: str) -> str | None:
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT value FROM settings WHERE key = ?", (key,)
-        ).fetchone()
-        return row["value"] if row else None
-
-
-def set_setting(key: str, value: str) -> None:
-    with _connect() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-            (key, value),
-        )

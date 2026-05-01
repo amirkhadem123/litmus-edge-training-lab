@@ -129,10 +129,14 @@ input[readonly] {
 
 {% block content %}
 <div class="settings-wrap">
-  <h1>AI Provider Settings</h1>
-  <p class="text-muted" style="margin-bottom:1.5rem">
+  <h1>Your AI Settings</h1>
+  <p class="text-muted" style="margin-bottom:0.4rem">
     Configure which AI service is used for attempt grading.
-    Settings are stored in the database and override environment variables.
+    These settings are private to your account.
+  </p>
+  <p class="text-muted" style="margin-bottom:1.5rem">
+    If your organization has a shared key, your administrator may have pre-configured a default —
+    you only need to change this if you want to use your own.
   </p>
 
   {% if saved %}

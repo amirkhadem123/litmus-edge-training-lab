@@ -9,6 +9,23 @@
   margin-bottom: 0.3rem;
 }
 
+.reset-pw-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.reset-pw-form input[type="text"] {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.55rem;
+  width: 160px;
+}
+.reset-pw-form .btn {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.65rem;
+  white-space: nowrap;
+}
+
 .trainee-table {
   width: 100%;
   border-collapse: collapse;
@@ -63,9 +80,15 @@
 {% block content %}
 <div class="admin-wrap">
   <h1>Admin View</h1>
-  <p class="text-muted" style="margin-bottom:1.5rem">
-    Read-only. {{ trainees | length }} trainee(s) registered.
+  <p class="text-muted" style="margin-bottom:1rem">
+    {{ trainees | length }} trainee(s) registered.
   </p>
+
+  {% if reset_done == 'error_short' %}
+  <div class="alert alert-error" style="margin-bottom:1rem">Password must be at least 8 characters.</div>
+  {% elif reset_done %}
+  <div class="alert alert-success" style="margin-bottom:1rem">Password reset for trainee #{{ reset_done }}.</div>
+  {% endif %}
 
   {% if not trainees %}
   <p class="text-muted">No trainees yet.</p>
@@ -74,7 +97,7 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Name</th>
+        <th>Name / Email</th>
         <th>Registered</th>
         <th>Checkpoint Progress</th>
         <th>Recent Attempts</th>
@@ -84,7 +107,15 @@
       {% for t in trainees %}
       <tr>
         <td style="color:#8a7e72;font-family:monospace">{{ t.id }}</td>
-        <td style="font-weight:600">{{ t.name }}</td>
+        <td>
+          <div style="font-weight:600">{{ t.name }}</div>
+          <div style="font-size:0.78rem;color:#7a6e62">{{ t.email }}</div>
+          <form class="reset-pw-form" method="POST" action="/admin/reset-password?pw={{ admin_pw }}">
+            <input type="hidden" name="trainee_id" value="{{ t.id }}" />
+            <input type="text" name="new_password" placeholder="New password" required minlength="8" />
+            <button type="submit" class="btn btn-ghost">Reset</button>
+          </form>
+        </td>
         <td style="color:#7a6e62;white-space:nowrap">{{ t.created_at[:10] }}</td>
         <td>
           <div class="cp-status-row">

@@ -112,8 +112,26 @@
 {% block content %}
 <div class="welcome-bar">
   <h1>Welcome, {{ trainee.name }}</h1>
-  <a class="change-name" href="/start">Not you?</a>
+  <form method="POST" action="/logout" style="display:inline">
+    <button type="submit" class="btn btn-ghost" style="padding:0.25rem 0.6rem;font-size:0.78rem">Sign out</button>
+  </form>
 </div>
+
+{% if alert == 'no_ai_key' %}
+<div class="alert alert-error" style="margin-bottom:1.25rem">
+  <strong>AI settings required.</strong>
+  You must configure your AI provider before starting a graded checkpoint.
+  <a href="/settings" style="font-weight:600;margin-left:0.5rem">Configure now →</a>
+</div>
+{% endif %}
+
+{% if not ai_configured %}
+<div class="alert alert-warning" style="margin-bottom:1.5rem">
+  <strong>AI settings not configured.</strong>
+  Graded checkpoints won't work until you add an API key and endpoint.
+  <a href="/settings" style="font-weight:600;margin-left:0.5rem">Configure now →</a>
+</div>
+{% endif %}
 
 <!-- ── Certificate Checkpoints ───────────────────────────────────── -->
 <div class="section-heading">Certificate Checkpoints</div>

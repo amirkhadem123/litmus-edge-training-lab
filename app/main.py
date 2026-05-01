@@ -2,9 +2,12 @@
 main.py — FastAPI application for Litmus Lab v2.
 
 Routes:
-    GET  /                              → redirect to /dashboard or /start
-    GET  /start                         → trainee name entry
-    POST /start                         → create/load trainee, set cookie, redirect to /dashboard
+    GET  /                              → redirect to /dashboard or /login
+    GET  /login                         → login form
+    POST /login                         → verify credentials, set cookie, redirect to /dashboard
+    GET  /register                      → registration form
+    POST /register                      → create account, set cookie, redirect to /dashboard
+    POST /logout                        → clear cookie, redirect to /login
     GET  /dashboard                     → certificate checkpoint cards + practice mode list
     GET  /attempt/{scenario_id}/new     → create attempt (check unlock) → redirect to attempt
     GET  /attempt/{attempt_id}          → conversation view
@@ -12,9 +15,10 @@ Routes:
     POST /attempt/{attempt_id}/submit   → grade in background, redirect to results
     GET  /attempt/{attempt_id}/results  → poll for grade; show when ready
     GET  /admin                         → read-only admin view (password protected)
-    GET  /settings                      → AI provider settings
-    POST /settings                      → save settings
-    POST /settings/test                 → test AI connection
+    POST /admin/reset-password          → admin: reset a trainee's password
+    GET  /settings                      → per-user AI provider settings
+    POST /settings                      → save per-user settings
+    POST /settings/test                 → test AI connection using current user's settings
 """
 
 import json
@@ -24,7 +28,6 @@ from pathlib import Path
 
 import httpx
 import jinja2
-import yaml
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -33,6 +36,8 @@ from openai import AsyncOpenAI
 
 from app.database import (
     add_message,
+    admin_reset_password,
+    check_password,
     create_attempt,
     create_grade,
     create_trainee,
@@ -43,14 +48,16 @@ from app.database import (
     get_checkpoint_progress,
     get_grade,
     get_messages,
-    get_setting,
     get_trainee,
-    get_trainee_by_name,
+    get_trainee_by_email,
+    get_trainee_settings,
+    hash_password,
     init_checkpoint_progress,
     init_db,
+    init_trainee_settings,
     mark_attempt_graded,
     mark_attempt_grade_failed,
-    set_setting,
+    set_trainee_setting,
     set_urgency_injected,
     submit_attempt,
     update_checkpoint_after_grade,
@@ -115,13 +122,15 @@ PROVIDER_PRESETS = {
 }
 
 
-def _load_ai_config() -> dict:
-    provider = get_setting("provider") or "openwebui"
+def _load_ai_config(trainee_id: int) -> dict:
+    """Load the trainee's personal AI settings, falling back to server env vars."""
+    s = get_trainee_settings(trainee_id)
+    provider = s.get("provider") or "claude"
     return {
         "provider":    provider,
-        "api_base":    get_setting("api_base")    or os.environ.get("LITMUS_API_BASE", ""),
-        "api_key":     get_setting("api_key")     or os.environ.get("LITMUS_API_KEY", ""),
-        "grade_model": get_setting("grade_model") or os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001"),
+        "api_base":    s.get("api_base") or os.environ.get("LITMUS_API_BASE", ""),
+        "api_key":     s.get("api_key") or os.environ.get("LITMUS_API_KEY", ""),
+        "grade_model": s.get("grade_model") or os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001"),
         "ssl_verify":  provider in ("claude", "gemini"),
     }
 
@@ -136,8 +145,12 @@ def _get_trainee_id(request: Request) -> int | None:
 
 
 def _require_trainee(request: Request) -> int | None:
-    """Return trainee_id from cookie, or None (caller should redirect to /start)."""
     return _get_trainee_id(request)
+
+
+def _has_ai_key(trainee_id: int) -> bool:
+    config = _load_ai_config(trainee_id)
+    return bool(config["api_key"] and config["api_base"])
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
@@ -147,59 +160,105 @@ def on_startup() -> None:
     init_db()
 
 
-# ── Core routes ───────────────────────────────────────────────────────────────
+# ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.get("/")
 async def root(request: Request):
     if _get_trainee_id(request):
         return RedirectResponse("/dashboard", status_code=303)
-    return RedirectResponse("/start", status_code=303)
+    return RedirectResponse("/login", status_code=303)
 
 
-@app.get("/start", response_class=HTMLResponse)
-async def start_form(request: Request) -> HTMLResponse:
+@app.get("/login", response_class=HTMLResponse)
+async def login_form(request: Request) -> HTMLResponse:
     if _get_trainee_id(request):
         return RedirectResponse("/dashboard", status_code=303)
-    return _render("start.html")
+    return _render("login.html")
 
 
-@app.post("/start")
-async def start_submit(request: Request, name: str = Form(...)) -> Response:
+@app.post("/login")
+async def login_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+) -> Response:
+    email = email.strip().lower()
+    trainee = get_trainee_by_email(email)
+    if not trainee or not check_password(password, trainee["password_hash"]):
+        return _render("login.html", error="Incorrect email or password.")
+
+    response = RedirectResponse("/dashboard", status_code=303)
+    response.set_cookie("trainee_id", str(trainee["id"]), httponly=True, path="/")
+    return response
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_form(request: Request) -> HTMLResponse:
+    if _get_trainee_id(request):
+        return RedirectResponse("/dashboard", status_code=303)
+    return _render("register.html")
+
+
+@app.post("/register")
+async def register_submit(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    confirm: str = Form(...),
+) -> Response:
     name = name.strip()
-    if not name:
-        return _render("start.html", error="Please enter your name.")
+    email = email.strip().lower()
 
-    trainee = get_trainee_by_name(name)
-    if trainee:
-        trainee_id = trainee["id"]
-    else:
-        trainee_id = create_trainee(name)
-        init_checkpoint_progress(trainee_id)
+    if not name or not email or not password:
+        return _render("register.html", error="All fields are required.", name=name, email=email)
+
+    if password != confirm:
+        return _render("register.html", error="Passwords do not match.", name=name, email=email)
+
+    if len(password) < 8:
+        return _render("register.html", error="Password must be at least 8 characters.", name=name, email=email)
+
+    if get_trainee_by_email(email):
+        return _render("register.html", error="An account with that email already exists.", name=name, email=email)
+
+    password_hash = hash_password(password)
+    trainee_id = create_trainee(name, email, password_hash)
+    init_checkpoint_progress(trainee_id)
+    init_trainee_settings(trainee_id)
 
     response = RedirectResponse("/dashboard", status_code=303)
     response.set_cookie("trainee_id", str(trainee_id), httponly=True, path="/")
     return response
 
 
+@app.post("/logout")
+async def logout() -> Response:
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie("trainee_id", path="/")
+    return response
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request) -> HTMLResponse:
+async def dashboard(request: Request, alert: str | None = None) -> HTMLResponse:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/start", status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     trainee = get_trainee(trainee_id)
     cp_progress = get_checkpoint_progress(trainee_id)
     cert_scenarios = load_certificate_scenarios()
     practice_scenarios = load_practice_scenarios()
+    ai_configured = _has_ai_key(trainee_id)
 
-    # Attach progress to each certificate scenario
     for s in cert_scenarios:
         cp = s.get("checkpoint")
         s["_progress"] = cp_progress.get(cp, {"status": "locked", "best_score": None, "attempts_used": 0})
 
-    # For practice scenarios, find the most recent attempt status
     all_attempts = get_attempts_for_trainee(trainee_id)
-    attempt_by_scenario = {}
+    attempt_by_scenario: dict = {}
     for a in all_attempts:
         sid = a["scenario_id"]
         if sid not in attempt_by_scenario or a["id"] > attempt_by_scenario[sid]["id"]:
@@ -214,6 +273,8 @@ async def dashboard(request: Request) -> HTMLResponse:
         cert_scenarios=cert_scenarios,
         practice_scenarios=practice_scenarios,
         cp_progress=cp_progress,
+        ai_configured=ai_configured,
+        alert=alert,
     )
 
 
@@ -223,7 +284,7 @@ async def dashboard(request: Request) -> HTMLResponse:
 async def new_attempt(request: Request, scenario_id: str) -> Response:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/start", status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     scenario = load_scenario(scenario_id)
     if not scenario:
@@ -232,26 +293,26 @@ async def new_attempt(request: Request, scenario_id: str) -> Response:
     mode = scenario.get("mode", "practice")
     checkpoint = scenario.get("checkpoint")
 
-    # For certificate mode: check unlock and re-attempt limit
     if mode == "certificate" and checkpoint:
+        # Block certificate attempts if AI is not configured
+        if not _has_ai_key(trainee_id):
+            return RedirectResponse("/dashboard?alert=no_ai_key", status_code=303)
+
         cp_progress = get_checkpoint_progress(trainee_id)
         progress = cp_progress.get(checkpoint, {})
         status = progress.get("status", "locked")
         if status in ("locked", "failed_no_reattempt"):
             return RedirectResponse("/dashboard", status_code=303)
 
-        # If re-attempting, set attempt_number to 2
         attempt_number = 2 if status == "failed_reattempt_available" else 1
     else:
         attempt_number = 1
 
-    # Resume existing in-progress attempt if one exists
     existing = get_active_attempt(trainee_id, scenario_id)
     if existing:
         return RedirectResponse(f"/attempt/{existing['id']}", status_code=303)
 
     attempt_id = create_attempt(trainee_id, scenario_id, checkpoint, mode, attempt_number)
-    # Post the customer's opening message as the first message
     add_message(attempt_id, "customer", scenario["ticket"]["initial_message"].strip())
 
     return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
@@ -263,7 +324,7 @@ async def new_attempt(request: Request, scenario_id: str) -> Response:
 async def view_attempt(request: Request, attempt_id: int) -> HTMLResponse:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/start", status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     attempt = get_attempt(attempt_id)
     if not attempt or attempt["trainee_id"] != trainee_id:
@@ -290,7 +351,7 @@ async def view_attempt(request: Request, attempt_id: int) -> HTMLResponse:
 async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Response:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/start", status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     attempt = get_attempt(attempt_id)
     if not attempt or attempt["trainee_id"] != trainee_id or attempt["status"] != "in_progress":
@@ -301,10 +362,8 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
     if not body_text:
         return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
 
-    # Save trainee message
     add_message(attempt_id, "trainee", body_text)
 
-    # Build scripted customer reply (with optional urgency injection)
     messages = get_messages(attempt_id)
     customer_reply, did_inject = build_customer_reply(
         scenario,
@@ -324,16 +383,16 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
 # ── Submit ────────────────────────────────────────────────────────────────────
 
 @app.post("/attempt/{attempt_id}/submit")
-async def submit(
+async def submit_attempt_route(
     attempt_id: int,
     request: Request,
     background_tasks: BackgroundTasks,
-    action: str = Form(...),       # "resolve" or "escalate"
+    action: str = Form(...),
     final_note: str = Form(""),
 ) -> Response:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/start", status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     attempt = get_attempt(attempt_id)
     if not attempt or attempt["trainee_id"] != trainee_id or attempt["status"] != "in_progress":
@@ -344,7 +403,7 @@ async def submit(
 
     submit_attempt(attempt_id, action)
 
-    config = _load_ai_config()
+    config = _load_ai_config(trainee_id)
     background_tasks.add_task(_run_grading, attempt_id, config)
 
     return RedirectResponse(f"/attempt/{attempt_id}/results", status_code=303)
@@ -352,11 +411,20 @@ async def submit(
 
 def _run_grading(attempt_id: int, config: dict) -> None:
     """Background task: grade attempt, write result to DB, update checkpoint progress."""
+    attempt = None
+    scenario = None
     try:
         attempt = get_attempt(attempt_id)
         scenario = load_scenario(attempt["scenario_id"])
         messages = get_messages(attempt_id)
         trainee_action = attempt["trainee_action"] or "resolve"
+
+        # Pre-flight: refuse to call API if no key configured
+        if not config.get("api_key") or not config.get("api_base"):
+            raise ValueError(
+                "AI API key or endpoint not configured. "
+                "Visit /settings to add your API credentials."
+            )
 
         grade = grade_response(
             scenario,
@@ -392,20 +460,16 @@ def _run_grading(attempt_id: int, config: dict) -> None:
 
     except Exception as exc:
         log.error("Grading failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
-        # Store a failure grade so the results page doesn't spin forever
         try:
             create_grade(
                 attempt_id=attempt_id,
                 total_score=0,
                 passed=False,
-                expected_action=scenario.get("expected_action", "resolve"),
-                trainee_action=attempt.get("trainee_action", "resolve"),
+                expected_action=(scenario or {}).get("expected_action", "resolve"),
+                trainee_action=(attempt or {}).get("trainee_action", "resolve"),
                 correct_direction=False,
                 dimension_scores=[],
-                overall_feedback=(
-                    f"GRADING FAILED — {type(exc).__name__}: {exc}\n\n"
-                    "Check AI settings at /settings."
-                ),
+                overall_feedback=str(exc),
                 raw_response=None,
             )
         except Exception:
@@ -419,7 +483,7 @@ def _run_grading(attempt_id: int, config: dict) -> None:
 async def results(request: Request, attempt_id: int) -> HTMLResponse:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/start", status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     attempt = get_attempt(attempt_id)
     if not attempt or attempt["trainee_id"] != trainee_id:
@@ -442,33 +506,45 @@ async def results(request: Request, attempt_id: int) -> HTMLResponse:
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
-@app.get("/admin", response_class=HTMLResponse)
-async def admin(request: Request) -> HTMLResponse:
+def _check_admin(request: Request) -> bool:
     admin_password = os.environ.get("LITMUS_ADMIN_PASSWORD", "")
     provided = request.query_params.get("pw", "")
-    if not admin_password or provided != admin_password:
-        return HTMLResponse(
-            "<h2>Access denied</h2><p>Add ?pw=... to the URL.</p>",
-            status_code=403,
-        )
+    return bool(admin_password and provided == admin_password)
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin(request: Request, reset_done: str | None = None) -> HTMLResponse:
+    if not _check_admin(request):
+        return HTMLResponse("<h2>Access denied</h2><p>Add ?pw=... to the URL.</p>", status_code=403)
 
     trainees = get_all_trainees()
     for t in trainees:
         t["cp_progress"] = get_checkpoint_progress(t["id"])
         t["attempts"] = get_attempts_for_trainee(t["id"])
 
-    return _render("admin.html", trainees=trainees)
+    pw = request.query_params.get("pw", "")
+    return _render("admin.html", trainees=trainees, admin_pw=pw, reset_done=reset_done)
+
+
+@app.post("/admin/reset-password")
+async def admin_reset(
+    request: Request,
+    trainee_id: int = Form(...),
+    new_password: str = Form(...),
+) -> Response:
+    if not _check_admin(request):
+        return HTMLResponse("<h2>Access denied</h2>", status_code=403)
+    pw = request.query_params.get("pw", "")
+    if len(new_password) < 8:
+        return RedirectResponse(f"/admin?pw={pw}&reset_done=error_short", status_code=303)
+    admin_reset_password(trainee_id, hash_password(new_password))
+    return RedirectResponse(f"/admin?pw={pw}&reset_done={trainee_id}", status_code=303)
 
 
 @app.get("/admin/attempt/{attempt_id}", response_class=HTMLResponse)
 async def admin_attempt(request: Request, attempt_id: int) -> HTMLResponse:
-    admin_password = os.environ.get("LITMUS_ADMIN_PASSWORD", "")
-    provided = request.query_params.get("pw", "")
-    if not admin_password or provided != admin_password:
-        return HTMLResponse(
-            "<h2>Access denied</h2><p>Add ?pw=... to the URL.</p>",
-            status_code=403,
-        )
+    if not _check_admin(request):
+        return HTMLResponse("<h2>Access denied</h2><p>Add ?pw=... to the URL.</p>", status_code=403)
 
     attempt = get_attempt(attempt_id)
     if not attempt:
@@ -476,14 +552,20 @@ async def admin_attempt(request: Request, attempt_id: int) -> HTMLResponse:
     trainee = get_trainee(attempt["trainee_id"])
     messages = get_messages(attempt_id)
     grade = get_grade(attempt_id)
-    return _render("admin_attempt.html", attempt=attempt, trainee=trainee, messages=messages, grade=grade)
+    pw = request.query_params.get("pw", "")
+    return _render("admin_attempt.html", attempt=attempt, trainee=trainee,
+                   messages=messages, grade=grade, admin_pw=pw)
 
 
 # ── Settings routes ───────────────────────────────────────────────────────────
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, saved: str | None = None) -> HTMLResponse:
-    config = _load_ai_config()
+    trainee_id = _require_trainee(request)
+    if not trainee_id:
+        return RedirectResponse("/login", status_code=303)
+
+    config = _load_ai_config(trainee_id)
     has_key = bool(config["api_key"])
     presets_json = json.dumps(PROVIDER_PRESETS)
     return _render(
@@ -497,22 +579,32 @@ async def settings_page(request: Request, saved: str | None = None) -> HTMLRespo
 
 @app.post("/settings")
 async def save_settings(
+    request: Request,
     provider:    str = Form(...),
     api_base:    str = Form(...),
     api_key:     str = Form(""),
     grade_model: str = Form(...),
-) -> RedirectResponse:
-    set_setting("provider",    provider.strip())
-    set_setting("api_base",    api_base.strip())
-    set_setting("grade_model", grade_model.strip())
+) -> Response:
+    trainee_id = _require_trainee(request)
+    if not trainee_id:
+        return RedirectResponse("/login", status_code=303)
+
+    set_trainee_setting(trainee_id, "provider",    provider.strip())
+    set_trainee_setting(trainee_id, "api_base",    api_base.strip())
+    set_trainee_setting(trainee_id, "grade_model", grade_model.strip())
     if api_key.strip():
-        set_setting("api_key", api_key.strip())
+        set_trainee_setting(trainee_id, "api_key", api_key.strip())
+
     return RedirectResponse("/settings?saved=1", status_code=303)
 
 
 @app.post("/settings/test")
 async def test_connection(request: Request) -> JSONResponse:
-    config = _load_ai_config()
+    trainee_id = _require_trainee(request)
+    if not trainee_id:
+        return JSONResponse({"ok": False, "message": "Not logged in."})
+
+    config = _load_ai_config(trainee_id)
     if not config["api_base"] or not config["api_key"]:
         return JSONResponse({"ok": False, "message": "API Endpoint URL and API Key are required."})
     try:
@@ -527,7 +619,7 @@ async def test_connection(request: Request) -> JSONResponse:
                 messages=[{"role": "user", "content": "Reply with the single word: ok"}],
                 max_tokens=10,
             )
-        reply = response.choices[0].message.content.strip()
-        return JSONResponse({"ok": True, "message": f"Connected. Model replied: {reply!r}"})
+        reply_text = response.choices[0].message.content.strip()
+        return JSONResponse({"ok": True, "message": f"Connected. Model replied: {reply_text!r}"})
     except Exception as exc:
         return JSONResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}"})
