@@ -323,6 +323,20 @@ def add_message(attempt_id: int, sender: str, content: str) -> int:
         return cur.lastrowid
 
 
+def reset_attempt_messages(attempt_id: int, initial_message: str) -> None:
+    """Wipe all messages for an attempt and re-seed with the opening customer message.
+    Also clears urgency_injected so urgency fires again on replay."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM messages WHERE attempt_id = ?", (attempt_id,))
+        conn.execute(
+            "UPDATE attempts SET urgency_injected = 0 WHERE id = ?", (attempt_id,)
+        )
+        conn.execute(
+            "INSERT INTO messages (attempt_id, sender, content, sequence) VALUES (?, ?, ?, 1)",
+            (attempt_id, "customer", initial_message.strip()),
+        )
+
+
 def get_messages(attempt_id: int) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(

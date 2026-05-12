@@ -57,6 +57,7 @@ from app.database import (
     init_trainee_settings,
     mark_attempt_graded,
     mark_attempt_grade_failed,
+    reset_attempt_messages,
     set_trainee_setting,
     set_urgency_injected,
     submit_attempt,
@@ -349,6 +350,23 @@ async def view_attempt(request: Request, attempt_id: int) -> HTMLResponse:
         grade=grade,
         trainee=trainee,
     )
+
+
+# ── Reset attempt ─────────────────────────────────────────────────────────────
+
+@app.post("/attempt/{attempt_id}/reset")
+async def reset_attempt(request: Request, attempt_id: int) -> Response:
+    trainee_id = _require_trainee(request)
+    if not trainee_id:
+        return RedirectResponse("/login", status_code=303)
+
+    attempt = get_attempt(attempt_id)
+    if not attempt or attempt["trainee_id"] != trainee_id or attempt["status"] != "in_progress":
+        return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
+
+    scenario = load_scenario(attempt["scenario_id"])
+    reset_attempt_messages(attempt_id, scenario["ticket"]["initial_message"])
+    return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
 
 
 # ── Reply ─────────────────────────────────────────────────────────────────────
