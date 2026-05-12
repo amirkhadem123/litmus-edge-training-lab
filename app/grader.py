@@ -39,6 +39,7 @@ def grade_response(
     api_key: str,
     model: str,
     ssl_verify: bool = True,
+    http_proxy: str | None = None,
 ) -> GradeResult:
     """
     Grade a trainee's full attempt against the scenario's dimensional rubric.
@@ -51,6 +52,10 @@ def grade_response(
         api_key:        API key.
         model:          Model name.
         ssl_verify:     False for internal endpoints with self-signed certs.
+        http_proxy:     Optional HTTP proxy URL (e.g. "http://127.0.0.1:40000").
+                        Required when the server runs outside the corporate network
+                        and the AI endpoint is only reachable via Cloudflare WARP
+                        in gateway/proxy mode. Set via LITMUS_HTTP_PROXY env var.
 
     Returns:
         GradeResult with dimensional scores and feedback.
@@ -121,7 +126,8 @@ Return a JSON object with EXACTLY this structure:
 The total_score MUST equal the sum of all dimension scores.
 Do not soften penalties — apply rubric guidance strictly."""
 
-    with httpx.Client(verify=ssl_verify) as http_client:
+    proxy_kwargs = {"proxy": http_proxy} if http_proxy else {}
+    with httpx.Client(verify=ssl_verify, **proxy_kwargs) as http_client:
         client = OpenAI(
             base_url=api_base,
             api_key=api_key,

@@ -126,12 +126,18 @@ def _load_ai_config(trainee_id: int) -> dict:
     """Load the trainee's personal AI settings, falling back to server env vars."""
     s = get_trainee_settings(trainee_id)
     provider = s.get("provider") or "claude"
+    # LITMUS_HTTP_PROXY is a server-level setting (not per-user) for environments
+    # where the AI endpoint is only reachable through a local proxy such as
+    # Cloudflare WARP in gateway mode. Unset on production servers that have
+    # direct network access to the AI endpoint.
+    http_proxy = os.environ.get("LITMUS_HTTP_PROXY", "").strip() or None
     return {
         "provider":    provider,
         "api_base":    s.get("api_base") or os.environ.get("LITMUS_API_BASE", ""),
         "api_key":     s.get("api_key") or os.environ.get("LITMUS_API_KEY", ""),
         "grade_model": s.get("grade_model") or os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001"),
         "ssl_verify":  provider in ("claude", "gemini"),
+        "http_proxy":  http_proxy,
     }
 
 
@@ -434,6 +440,7 @@ def _run_grading(attempt_id: int, config: dict) -> None:
             api_key=config["api_key"],
             model=config["grade_model"],
             ssl_verify=config["ssl_verify"],
+            http_proxy=config.get("http_proxy"),
         )
 
         create_grade(
@@ -608,7 +615,8 @@ async def test_connection(request: Request) -> JSONResponse:
     if not config["api_base"] or not config["api_key"]:
         return JSONResponse({"ok": False, "message": "API Endpoint URL and API Key are required."})
     try:
-        async with httpx.AsyncClient(verify=config["ssl_verify"]) as http_client:
+        proxy_kwargs = {"proxy": config["http_proxy"]} if config.get("http_proxy") else {}
+        async with httpx.AsyncClient(verify=config["ssl_verify"], **proxy_kwargs) as http_client:
             client = AsyncOpenAI(
                 base_url=config["api_base"],
                 api_key=config["api_key"],

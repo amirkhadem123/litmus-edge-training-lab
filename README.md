@@ -537,6 +537,7 @@ If unset, the admin page returns 403 for all requests.
 | `LITMUS_API_KEY` | No | — | Fallback API key (overridden by per-user setting) |
 | `LITMUS_GRADE_MODEL` | No | `claude-haiku-4-5-20251001` | Fallback grade model (overridden by per-user setting) |
 | `LITMUS_PROVIDER` | No | `claude` | Fallback provider name (`openwebui`, `claude`, `gemini`) |
+| `LITMUS_HTTP_PROXY` | No | — | HTTP proxy for AI API calls (see below) |
 | `LITMUS_DATA_DIR` | No | `.` (project root) | Directory for the SQLite DB file |
 
 **Fallback chain for AI settings:** user's saved setting → server env var → hardcoded default.
@@ -544,3 +545,27 @@ If unset, the admin page returns 403 for all requests.
 New users automatically inherit whatever is set in the server env vars, so setting
 `LITMUS_API_KEY` and `LITMUS_API_BASE` in `.env` means users can start graded
 checkpoints immediately without configuring anything themselves.
+
+### Cloudflare WARP / corporate proxy (`LITMUS_HTTP_PROXY`)
+
+If the AI endpoint (Open WebUI) is behind Cloudflare WARP, the server process must
+route its HTTP requests through the WARP proxy. This only applies when running the
+app **outside the corporate network** (e.g. a developer's laptop). The production
+Linux VM has direct internal network access and does not need this.
+
+Cloudflare WARP on Windows runs a local HTTP proxy, typically at `127.0.0.1:40000`.
+To find the exact port:
+
+```powershell
+netstat -an | findstr "4000"
+```
+
+Then add to `.env`:
+
+```
+LITMUS_HTTP_PROXY=http://127.0.0.1:40000
+```
+
+When set, every outbound AI API call — both grading and the Test Connection button —
+routes through this proxy. When unset, the standard OS-level network stack is used
+(which is correct for the production server).
