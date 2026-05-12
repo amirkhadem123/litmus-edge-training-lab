@@ -390,13 +390,22 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
 
     messages = get_messages(attempt_id)
     ai_config = _load_ai_config(trainee_id)
-    customer_reply, did_inject = await build_customer_reply(
-        scenario,
-        body_text,
-        messages,
-        bool(attempt["urgency_injected"]),
-        api_config=ai_config,
-    )
+    try:
+        customer_reply, did_inject = await build_customer_reply(
+            scenario,
+            body_text,
+            messages,
+            bool(attempt["urgency_injected"]),
+            api_config=ai_config,
+        )
+    except Exception as exc:
+        log.error("Customer reply failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
+        customer_reply = (
+            "[System: Could not reach the AI service to generate a customer reply. "
+            "Check your AI settings at /settings and make sure your connection is working, "
+            "then try again.]"
+        )
+        did_inject = False
 
     add_message(attempt_id, "customer", customer_reply)
 

@@ -209,13 +209,12 @@
           <label for="body">Your reply</label>
           <textarea id="body" name="body" placeholder="Ask a diagnostic question or provide information…" autofocus></textarea>
         </div>
-        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-          <button type="submit" class="btn btn-primary">Send Reply</button>
-          <form method="POST" action="/attempt/{{ attempt.id }}/reset" style="display:inline"
-                onsubmit="return confirm('Start over? This will clear the conversation and begin again from the customer\'s opening message.')">
-            <button type="submit" class="btn btn-ghost" style="font-size:0.8rem">↺ Start Over</button>
-          </form>
-        </div>
+        <button type="submit" class="btn btn-primary">Send Reply</button>
+      </form>
+
+      <form method="POST" action="/attempt/{{ attempt.id }}/reset" style="margin-top:0.6rem"
+            onsubmit="return confirm('Start over? This will clear the conversation and begin again from the customer\'s opening message.')">
+        <button type="submit" class="btn btn-ghost" style="font-size:0.8rem">↺ Start Over</button>
       </form>
     </div>
 
