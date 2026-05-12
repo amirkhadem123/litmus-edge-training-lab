@@ -546,26 +546,37 @@ New users automatically inherit whatever is set in the server env vars, so setti
 `LITMUS_API_KEY` and `LITMUS_API_BASE` in `.env` means users can start graded
 checkpoints immediately without configuring anything themselves.
 
-### Cloudflare WARP / corporate proxy (`LITMUS_HTTP_PROXY`)
+### Cloudflare WARP (`LITMUS_HTTP_PROXY`)
 
-If the AI endpoint (Open WebUI) is behind Cloudflare WARP, the server process must
-route its HTTP requests through the WARP proxy. This only applies when running the
-app **outside the corporate network** (e.g. a developer's laptop). The production
-Linux VM has direct internal network access and does not need this.
+The company's Open WebUI is only reachable through Cloudflare WARP. WARP can run
+in two modes, and they behave differently for server-side HTTP calls:
 
-Cloudflare WARP on Windows runs a local HTTP proxy, typically at `127.0.0.1:40000`.
-To find the exact port:
+**Full tunnel mode** (most common for corporate deployments)
 
+WARP acts like a VPN — all traffic from the machine is routed through the tunnel
+at the OS level. Python's `httpx` goes through it automatically. **No configuration
+needed.** The only requirement is that WARP is running and connected when you start
+the server. If you see "Please authenticate via the warp client", check your WARP
+client first — a disconnected or expired session is the most likely cause.
+
+To confirm you're in full tunnel mode:
 ```powershell
 netstat -an | findstr "4000"
 ```
+If this returns nothing, you're in full tunnel mode. No `.env` change needed.
 
-Then add to `.env`:
+**Gateway / proxy mode** (less common)
 
+WARP runs a local HTTP proxy instead of a full tunnel. Python doesn't know about it
+unless told explicitly. In this case, find the proxy port:
+```powershell
+netstat -an | findstr "4000"
+```
+You'll see a line like `127.0.0.1:40000`. Add to `.env`:
 ```
 LITMUS_HTTP_PROXY=http://127.0.0.1:40000
 ```
 
-When set, every outbound AI API call — both grading and the Test Connection button —
-routes through this proxy. When unset, the standard OS-level network stack is used
-(which is correct for the production server).
+When set, every outbound AI API call (grading and Test Connection) routes through
+this proxy. The production Linux VM is on the internal network directly and should
+never have this variable set.
