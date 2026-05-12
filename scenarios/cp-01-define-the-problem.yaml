@@ -14,6 +14,32 @@ customer:
   ui_access: true
   technical_level: low
 
+ticket:
+  subject: "Production dashboard stopped updating — temperature readings frozen"
+  initial_message: |
+    Hi,
+
+    I'm Sarah Chen, Operations Manager at Riverside Plastics Corp. I'm hoping
+    you can help — our production monitoring dashboard stopped showing live data
+    this morning. All the temperature readings are stuck and not updating at all.
+    Everything was working fine yesterday, but when our operators came in today
+    the numbers were frozen.
+
+    We rely on this dashboard to monitor the plant floor, so any help getting it
+    working again would be much appreciated.
+
+    Thanks,
+    Sarah
+
+diagnostic_checklist:
+  - Ask about device status in DeviceHub — is the device running or stopped?
+  - Identify which device / tag is affected (name, location)
+  - Establish precise timing — when exactly did values stop updating?
+  - Ask what changed — did anyone access the system around that time?
+  - Guide Sarah to DeviceHub (she is not Litmus-certified — give step-by-step navigation)
+  - Confirm the device status badge and report back before taking action
+  - Verify dashboard values resume updating after the fix
+
 customer_persona: |
   Sarah is an Operations Manager at a mid-size plastics manufacturing plant. She is
   not a technical user — she relies on her IT team and the Litmus support team for
