@@ -188,7 +188,8 @@ async def get_ai_customer_reply(
             messages=chat_messages,
         )
 
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content
+    return (content or "").strip()
 
 
 # ── Urgency injection (Checkpoint 3 only) ─────────────────────────────────────

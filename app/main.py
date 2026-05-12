@@ -401,9 +401,8 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
     except Exception as exc:
         log.error("Customer reply failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
         customer_reply = (
-            "[System: Could not reach the AI service to generate a customer reply. "
-            "Check your AI settings at /settings and make sure your connection is working, "
-            "then try again.]"
+            f"[System: Customer reply failed ({type(exc).__name__}: {exc}). "
+            "Check your AI settings at /settings.]"
         )
         did_inject = False
 
@@ -656,7 +655,10 @@ async def test_connection(request: Request) -> JSONResponse:
                 messages=[{"role": "user", "content": "Reply with the single word: ok"}],
                 max_tokens=10,
             )
-        reply_text = response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content
+        reply_text = (raw or "").strip()
+        if not reply_text:
+            return JSONResponse({"ok": False, "message": "Connected but model returned empty content. Try a different model or check your Open WebUI model configuration."})
         return JSONResponse({"ok": True, "message": f"Connected. Model replied: {reply_text!r}"})
     except Exception as exc:
         return JSONResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}"})
