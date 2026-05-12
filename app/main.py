@@ -371,11 +371,13 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
     add_message(attempt_id, "trainee", body_text)
 
     messages = get_messages(attempt_id)
-    customer_reply, did_inject = build_customer_reply(
+    ai_config = _load_ai_config(trainee_id)
+    customer_reply, did_inject = await build_customer_reply(
         scenario,
         body_text,
         messages,
         bool(attempt["urgency_injected"]),
+        api_config=ai_config,
     )
 
     add_message(attempt_id, "customer", customer_reply)

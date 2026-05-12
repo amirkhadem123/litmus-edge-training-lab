@@ -49,10 +49,18 @@ Trainee begins a checkpoint or practice attempt
 Repeat until all three checkpoints are passed → certificate complete
 ```
 
-**Customer simulation is scripted**, not generative. Each scenario defines a list
-of keyword triggers and pre-written replies. This ensures every trainee who asks
-the right diagnostic question gets the right information — regardless of phrasing —
-making grading fair and reproducible.
+**Customer simulation uses two modes depending on the scenario type:**
+
+- **Certificate checkpoints (CP1–CP3)** — AI-powered. The customer is played by
+  an LLM given a detailed persona, a knowledge base (what they observe, what they
+  can do, what they don't know), and a set of information they only reveal when
+  specifically asked. The customer responds naturally to any phrasing and behaves
+  like a real non-technical user — confused by jargon, cooperative when guided,
+  genuinely uncertain about things their character would not know.
+
+- **Practice scenarios** — Keyword-triggered. Each scenario defines a list of
+  triggers and pre-written replies. Deterministic and fast; no API call needed
+  to generate a customer reply.
 
 **Grading is AI-powered** (OpenAI-compatible endpoint). The LLM evaluates each
 rubric dimension independently. Critical score caps (e.g. wrong resolve/escalate
@@ -262,7 +270,10 @@ There is no email-based self-service password reset — the admin handles it dir
 
 ### Scenario YAML structure
 
-Every scenario defines:
+All scenarios share a common header, then diverge based on which customer simulation
+mode they use.
+
+**Common header (all scenarios):**
 
 ```yaml
 id: cp-01                            # unique identifier
@@ -276,30 +287,83 @@ customer:
   name: Customer Name
   company: Company Name
   le_version: "4.0.6"
+  role: Operations Manager           # used in AI persona
+  litmus_certified: false            # affects navigation guidance in AI simulation
+  ui_access: true                    # whether customer can check the UI themselves
+  technical_level: low               # low | medium | high — shapes reply language
 
 ticket:
   subject: "Subject line"
   initial_message: |
-    Customer's opening email. Written in first person.
-
-diagnostic_checklist:
-  - "Checklist item shown in the sidebar to guide the trainee"
+    Customer's opening message. Written in first person.
 
 root_cause: |
   Internal explanation. NOT shown to the trainee — used by the grader only.
 
-correct_response_summary: |          # for resolve scenarios
+correct_response_summary: |
   1. Step one
   2. Step two
 
-# Scripted keyword-triggered customer replies
+grading_rubric:
+  pass_threshold: 70
+  dimensions:
+    - name: Proactive first response
+      max_points: 40
+      description: |
+        Scoring guidance for the grading LLM...
+  critical_penalties:
+    - condition: wrong_direction
+      cap: cap_at_50
+      applies_to_checkpoints: [3]
+    - condition: sequence_skipped
+      cap: cap_at_40
+      applies_to_checkpoints: [2]
+```
+
+---
+
+**AI-powered customer simulation** (certificate checkpoints — CP1, CP2, CP3):
+
+Replace `scripted_replies` / `fallback_reply` with a persona and knowledge base.
+The LLM plays the customer using this as its system prompt.
+
+```yaml
+customer_persona: |
+  Sarah is an Operations Manager at a plastics plant. She is not technical —
+  she doesn't know what DeviceHub is. She is patient and will follow step-by-step
+  instructions carefully. She communicates in plain language.
+
+customer_knowledge:
+  observes: |
+    What the customer currently sees — the visible symptom from their perspective.
+  can_do: |
+    What they are physically able to do if instructed (click buttons, read screens).
+  does_not_know: |
+    What they genuinely don't know — the LLM will not reveal this.
+  withheld:
+    - info: >
+        A colleague accessed the device list this morning and may have clicked something.
+      release_when: >
+        analyst asks about recent activity, whether anyone else accessed the system,
+        or what happened around the time the issue started
+```
+
+The `withheld` list controls information the customer only reveals when the analyst
+asks the right question. Each item has an `info` (what to reveal) and `release_when`
+(the condition that triggers disclosure). This is how the scenario rewards thorough
+symptom extraction — the key diagnostic clue stays hidden until earned.
+
+---
+
+**Keyword-triggered customer simulation** (practice scenarios — dh-s01, dh-s02):
+
+```yaml
 scripted_replies:
   - triggers:
-      - "log"
       - "device log"
-      - "check the log"
+      - "log"
     reply: |
-      I've opened the device log. I see the following error repeating...
+      I've opened the device log. I can see this error repeating...
 
   - triggers:
       - "restart"
@@ -308,48 +372,25 @@ scripted_replies:
 
 fallback_reply: |
   I'm not sure what you mean. Could you be more specific?
-
-# Urgency injection (optional — CP3 only)
-urgency_injection:
-  enabled: true
-  trigger_after_customer_message: 3  # fires on the 3rd customer reply
-  text: |
-    I should also mention — we have a compliance audit in 48 hours...
-
-# Dimensional grading rubric
-grading_rubric:
-  pass_threshold: 70
-  dimensions:
-    - name: Proactive first response
-      max_points: 40
-      description: |
-        Award full points if the trainee immediately directed the customer to
-        DeviceHub to check device status...
-
-    - name: Symptom extraction
-      max_points: 35
-      description: |
-        Award full points if the trainee gathered: device status, timing,
-        and recent changes...
-
-  critical_penalties:
-    - condition: wrong_direction
-      cap: cap_at_50
-      applies_to_checkpoints: [3]    # empty list [] = never applies
-
-    - condition: sequence_skipped
-      cap: cap_at_40
-      applies_to_checkpoints: [2]
 ```
 
-### Keyword matching
+Case-insensitive partial matching. The first trigger that appears anywhere in the
+trainee's message wins — order from most-specific to least-specific.
 
-The customer reply engine uses case-insensitive partial matching. The first
-matching trigger in the `scripted_replies` list wins, so order from
-most-specific to least-specific.
+---
 
-A trigger of `"log"` matches any trainee message containing the word "log"
-(e.g. "please check the device log", "can you open the log file?").
+**Urgency injection** (optional — CP3 only):
+
+Works the same way in both simulation modes. The text is appended to the customer's
+reply after a set number of customer messages have been sent.
+
+```yaml
+urgency_injection:
+  enabled: true
+  trigger_after_customer_message: 3  # appended to the 3rd customer reply
+  text: |
+    I should also mention — we have a compliance audit in 48 hours...
+```
 
 ---
 
@@ -506,9 +547,11 @@ If unset, the admin page returns 403 for all requests.
   so an admin can pre-configure a shared company key that all users inherit until
   they override it.
 
-- **Scripted customer simulation** — deterministic keyword matching instead of
-  generative AI. Every trainee who asks the right question gets the right answer.
-  This is mandatory for fair grading.
+- **Dual-mode customer simulation** — certificate checkpoints use an LLM-powered
+  customer with a defined persona, knowledge base, and withheld information that
+  only surfaces when the analyst asks the right question. Practice scenarios use
+  deterministic keyword matching (no API call, no variability). Grading evaluates
+  the full transcript regardless of which mode generated the replies.
 
 - **Penalties enforced in Python** — score caps for wrong direction and skipped
   diagnostic sequences are applied after the LLM response is parsed. The LLM
