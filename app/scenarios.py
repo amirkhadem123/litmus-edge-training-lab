@@ -184,7 +184,6 @@ async def get_ai_customer_reply(
         response = await client.chat.completions.create(
             model=api_config["grade_model"],
             max_tokens=300,
-            temperature=0.7,
             messages=chat_messages,
         )
 

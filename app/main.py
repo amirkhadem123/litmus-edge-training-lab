@@ -653,7 +653,7 @@ async def test_connection(request: Request) -> JSONResponse:
             response = await client.chat.completions.create(
                 model=config["grade_model"],
                 messages=[{"role": "user", "content": "Reply with the single word: ok"}],
-                max_tokens=10,
+                max_tokens=50,
             )
         raw = response.choices[0].message.content
         reply_text = (raw or "").strip()
