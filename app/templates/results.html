@@ -304,8 +304,10 @@
     <div style="display:flex;gap:0.75rem;margin-top:1.5rem;flex-wrap:wrap">
       <a href="/dashboard" class="btn btn-primary">← Back to Dashboard</a>
       {% if not grade.passed and attempt.checkpoint %}
-        {% set cp_num = attempt.checkpoint %}
         <a href="/attempt/{{ scenario.id }}/new" class="btn btn-warning">Try Again</a>
+      {% endif %}
+      {% if grade.passed and workramp_return_url %}
+        <a href="{{ workramp_return_url }}" class="btn btn-success">Return to Academy →</a>
       {% endif %}
     </div>
 
