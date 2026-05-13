@@ -190,7 +190,7 @@
     </div>
 
     <!-- Conversation thread -->
-    <div class="thread">
+    <div class="thread" id="thread">
       {% for msg in messages %}
       <div>
         <div class="msg-label">
@@ -204,12 +204,12 @@
     <!-- Reply form (only when in progress) -->
     {% if attempt.status == 'in_progress' %}
     <div class="reply-section">
-      <form method="POST" action="/attempt/{{ attempt.id }}/reply">
+      <form id="reply-form" method="POST" action="/attempt/{{ attempt.id }}/reply">
         <div class="form-group">
           <label for="body">Your reply</label>
           <textarea id="body" name="body" placeholder="Ask a diagnostic question or provide information…" autofocus></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Send Reply</button>
+        <button type="submit" id="send-btn" class="btn btn-primary">Send Reply</button>
       </form>
 
       <form method="POST" action="/attempt/{{ attempt.id }}/reset" style="margin-top:0.6rem"
@@ -309,5 +309,85 @@ function hideSubmit() {
   document.getElementById('form-resolve').classList.remove('visible');
   document.getElementById('form-escalate').classList.remove('visible');
 }
+
+{% if attempt.status == 'in_progress' %}
+(function () {
+  const TRAINEE_NAME = {{ trainee.name | tojson }};
+  const CUSTOMER_NAME = {{ scenario.customer.name | tojson }};
+  const thread = document.getElementById('thread');
+  const form   = document.getElementById('reply-form');
+  const textarea = document.getElementById('body');
+  const sendBtn  = document.getElementById('send-btn');
+
+  function appendMessage(sender, label, text) {
+    const wrap = document.createElement('div');
+    const lbl  = document.createElement('div');
+    lbl.className = 'msg-label';
+    lbl.textContent = label;
+    const bubble = document.createElement('div');
+    bubble.className = 'msg msg-' + sender;
+    bubble.style.whiteSpace = 'pre-wrap';
+    bubble.textContent = text;
+    wrap.appendChild(lbl);
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    wrap.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    return wrap;
+  }
+
+  function appendTypingIndicator(label) {
+    const wrap = document.createElement('div');
+    const lbl  = document.createElement('div');
+    lbl.className = 'msg-label';
+    lbl.textContent = label;
+    const bubble = document.createElement('div');
+    bubble.className = 'msg msg-customer';
+    bubble.style.color = '#7a6e62';
+    bubble.innerHTML = '<span class="spinner"></span> typing…';
+    wrap.appendChild(lbl);
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    wrap.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    return wrap;
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const body = textarea.value.trim();
+    if (!body) return;
+
+    // Immediately show the trainee's message
+    appendMessage('trainee', TRAINEE_NAME + ' (You)', body);
+    textarea.value = '';
+    textarea.disabled = true;
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending…';
+
+    // Show typing indicator
+    const typingEl = appendTypingIndicator(CUSTOMER_NAME + ' (Customer)');
+
+    try {
+      const fd = new FormData();
+      fd.append('body', body);
+      const resp = await fetch(form.action, {method: 'POST', body: fd});
+      const data = await resp.json();
+      typingEl.remove();
+      if (data.error) {
+        appendMessage('customer', 'System', data.error);
+      } else {
+        appendMessage('customer', CUSTOMER_NAME + ' (Customer)', data.customer_reply);
+      }
+    } catch (err) {
+      typingEl.remove();
+      appendMessage('customer', 'System', 'Network error — could not reach the server. Please reload the page.');
+    }
+
+    textarea.disabled = false;
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send Reply';
+    textarea.focus();
+  });
+}());
+{% endif %}
 </script>
 {% endblock %}

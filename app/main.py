@@ -375,16 +375,16 @@ async def reset_attempt(request: Request, attempt_id: int) -> Response:
 async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Response:
     trainee_id = _require_trainee(request)
     if not trainee_id:
-        return RedirectResponse("/login", status_code=303)
+        return JSONResponse({"error": "Not logged in."}, status_code=401)
 
     attempt = get_attempt(attempt_id)
     if not attempt or attempt["trainee_id"] != trainee_id or attempt["status"] != "in_progress":
-        return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
+        return JSONResponse({"error": "Attempt not found or not in progress."}, status_code=400)
 
     scenario = load_scenario(attempt["scenario_id"])
     body_text = body.strip()
     if not body_text:
-        return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
+        return JSONResponse({"error": "Reply cannot be empty."}, status_code=400)
 
     add_message(attempt_id, "trainee", body_text)
 
@@ -411,7 +411,7 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
     if did_inject:
         set_urgency_injected(attempt_id)
 
-    return RedirectResponse(f"/attempt/{attempt_id}", status_code=303)
+    return JSONResponse({"trainee_message": body_text, "customer_reply": customer_reply})
 
 
 # ── Submit ────────────────────────────────────────────────────────────────────
