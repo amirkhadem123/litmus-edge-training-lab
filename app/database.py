@@ -55,6 +55,12 @@ def init_db() -> None:
                 DROP TABLE IF EXISTS trainees;
             """)
 
+        # Unlock any checkpoints that were locked under the old sequential-unlock scheme
+        conn.execute(
+            "UPDATE checkpoint_progress SET status = 'available', unlocked_at = CURRENT_TIMESTAMP "
+            "WHERE status = 'locked'"
+        )
+
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS trainees (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -395,17 +401,12 @@ def get_grade(attempt_id: int) -> dict | None:
 # ── Checkpoint progress operations ────────────────────────────────────────────
 
 def init_checkpoint_progress(trainee_id: int) -> None:
-    """Create progress rows for checkpoints 1–3. CP1 available, 2 and 3 locked."""
+    """Create progress rows for checkpoints 1–3. All start as available."""
     with _connect() as conn:
-        conn.execute(
-            """INSERT OR IGNORE INTO checkpoint_progress (trainee_id, checkpoint, status, unlocked_at)
-               VALUES (?, 1, 'available', CURRENT_TIMESTAMP)""",
-            (trainee_id,),
-        )
-        for cp in (2, 3):
+        for cp in (1, 2, 3):
             conn.execute(
-                """INSERT OR IGNORE INTO checkpoint_progress (trainee_id, checkpoint, status)
-                   VALUES (?, ?, 'locked')""",
+                """INSERT OR IGNORE INTO checkpoint_progress (trainee_id, checkpoint, status, unlocked_at)
+                   VALUES (?, ?, 'available', CURRENT_TIMESTAMP)""",
                 (trainee_id, cp),
             )
 
@@ -452,11 +453,3 @@ def update_checkpoint_after_grade(
             (new_status, best_score, attempts_used, trainee_id, checkpoint),
         )
 
-        if passed and checkpoint < 3:
-            conn.execute(
-                """UPDATE checkpoint_progress
-                   SET status = 'available', unlocked_at = CURRENT_TIMESTAMP,
-                       updated_at = CURRENT_TIMESTAMP
-                   WHERE trainee_id = ? AND checkpoint = ? AND status = 'locked'""",
-                (trainee_id, checkpoint + 1),
-            )

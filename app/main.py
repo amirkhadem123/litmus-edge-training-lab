@@ -67,7 +67,6 @@ from app.grader import GradeResult, format_grade_display, grade_response
 from app.scenarios import (
     build_customer_reply,
     load_certificate_scenarios,
-    load_practice_scenarios,
     load_scenario,
 )
 
@@ -257,28 +256,16 @@ async def dashboard(request: Request, alert: str | None = None) -> HTMLResponse:
     trainee = get_trainee(trainee_id)
     cp_progress = get_checkpoint_progress(trainee_id)
     cert_scenarios = load_certificate_scenarios()
-    practice_scenarios = load_practice_scenarios()
     ai_configured = _has_ai_key(trainee_id)
 
     for s in cert_scenarios:
         cp = s.get("checkpoint")
-        s["_progress"] = cp_progress.get(cp, {"status": "locked", "best_score": None, "attempts_used": 0})
-
-    all_attempts = get_attempts_for_trainee(trainee_id)
-    attempt_by_scenario: dict = {}
-    for a in all_attempts:
-        sid = a["scenario_id"]
-        if sid not in attempt_by_scenario or a["id"] > attempt_by_scenario[sid]["id"]:
-            attempt_by_scenario[sid] = a
-
-    for s in practice_scenarios:
-        s["_last_attempt"] = attempt_by_scenario.get(s["id"])
+        s["_progress"] = cp_progress.get(cp, {"status": "available", "best_score": None, "attempts_used": 0})
 
     return _render(
         "dashboard.html",
         trainee=trainee,
         cert_scenarios=cert_scenarios,
-        practice_scenarios=practice_scenarios,
         cp_progress=cp_progress,
         ai_configured=ai_configured,
         alert=alert,
@@ -307,10 +294,7 @@ async def new_attempt(request: Request, scenario_id: str) -> Response:
 
         cp_progress = get_checkpoint_progress(trainee_id)
         progress = cp_progress.get(checkpoint, {})
-        status = progress.get("status", "locked")
-        if status in ("locked", "failed_no_reattempt"):
-            return RedirectResponse("/dashboard", status_code=303)
-
+        status = progress.get("status", "available")
         attempt_number = 2 if status == "failed_reattempt_available" else 1
     else:
         attempt_number = 1

@@ -82,31 +82,6 @@
 .cp-score.failed { color: #9c3030; }
 .cp-action { margin-top: auto; padding-top: 0.75rem; }
 
-/* ── Practice table ────────────────────────────────────────────────── */
-.practice-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-.practice-table th {
-  text-align: left;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #8a7e72;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #d8d0c0;
-}
-.practice-table td {
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid #ede8df;
-  color: #2c2318;
-  vertical-align: middle;
-}
-.practice-table tr:last-child td { border-bottom: none; }
-.practice-table tr:hover td { background: #f5f0e8; }
-.scenario-id { font-family: monospace; color: #7a6e62; font-size: 0.8rem; }
 {% endblock %}
 
 {% block content %}
@@ -186,39 +161,4 @@
   {% endfor %}
 </div>
 
-<!-- ── Practice Mode ─────────────────────────────────────────────── -->
-<div class="section-heading" style="margin-top:0.5rem">Practice Mode</div>
-<p class="text-muted" style="margin-bottom:1rem">
-  Practice scenarios are always available — no unlock required, not graded toward your certificate.
-</p>
-
-<table class="practice-table">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>Scenario</th>
-      <th>Difficulty</th>
-      <th>Expected action</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for s in practice_scenarios %}
-    <tr>
-      <td class="scenario-id">{{ s.id }}</td>
-      <td>{{ s.title }}</td>
-      <td><span class="badge badge-{{ s.difficulty }}">{{ s.difficulty }}</span></td>
-      <td>{{ s.expected_action | capitalize }}</td>
-      <td>
-        <a href="/attempt/{{ s.id }}/new" class="btn btn-ghost" style="padding:0.3rem 0.7rem;font-size:0.8rem">
-          {% if s._last_attempt and s._last_attempt.status == 'in_progress' %}Continue{% else %}Start{% endif %}
-        </a>
-      </td>
-    </tr>
-    {% endfor %}
-    {% if not practice_scenarios %}
-    <tr><td colspan="5" class="text-muted" style="padding:1.5rem 0.75rem">No practice scenarios available yet.</td></tr>
-    {% endif %}
-  </tbody>
-</table>
 {% endblock %}
