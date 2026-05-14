@@ -400,10 +400,17 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
         )
     except Exception as exc:
         log.error("Customer reply failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
-        customer_reply = (
-            f"[System: Customer reply failed ({type(exc).__name__}: {exc}). "
-            "Check your AI settings at /settings.]"
-        )
+        if "authenticate via the warp client" in str(exc).lower():
+            customer_reply = (
+                "[System: Cloudflare WARP is not connected. "
+                "Reconnect the WARP client and try again. "
+                "If WARP is running in gateway mode, set LITMUS_HTTP_PROXY in your .env.]"
+            )
+        else:
+            customer_reply = (
+                f"[System: Customer reply failed ({type(exc).__name__}: {exc}). "
+                "Check your AI settings at /settings.]"
+            )
         did_inject = False
 
     add_message(attempt_id, "customer", customer_reply)
@@ -667,4 +674,6 @@ async def test_connection(request: Request) -> JSONResponse:
             return JSONResponse({"ok": False, "message": "Connected but model returned empty content. Try a different model or check your Open WebUI model configuration."})
         return JSONResponse({"ok": True, "message": f"Connected. Model replied: {reply_text!r}"})
     except Exception as exc:
+        if "authenticate via the warp client" in str(exc).lower():
+            return JSONResponse({"ok": False, "message": "Cloudflare WARP is not connected. Reconnect the WARP client and try again. If WARP is running in gateway mode, set LITMUS_HTTP_PROXY in your .env."})
         return JSONResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}"})
