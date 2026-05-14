@@ -31,7 +31,6 @@ import jinja2
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 
 from app.database import (
@@ -75,11 +74,6 @@ log = logging.getLogger(__name__)
 
 app = FastAPI(title="Litmus Lab")
 
-app.mount(
-    "/screenshots",
-    StaticFiles(directory="scenarios/screenshots"),
-    name="screenshots",
-)
 
 _jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader("app/templates"),
