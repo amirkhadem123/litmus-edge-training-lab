@@ -94,10 +94,10 @@ PROVIDER_PRESETS = {
     "openwebui": {
         "label": "Open WebUI",
         "description": "Internal or custom OpenAI-compatible server",
-        "api_base": "",
-        "api_base_placeholder": "https://ai.internal.yourcompany.com/api",
+        "api_base": "https://ai.internal.litmus.io/api",
+        "api_base_placeholder": "https://ai.internal.litmus.io/api",
         "api_base_editable": True,
-        "grade_model": "claude-haiku-4-5-20251001",
+        "grade_model": "gpt-4o",
     },
     "claude": {
         "label": "Anthropic Claude",
@@ -121,7 +121,7 @@ PROVIDER_PRESETS = {
 def _load_ai_config(trainee_id: int) -> dict:
     """Load the trainee's personal AI settings, falling back to server env vars."""
     s = get_trainee_settings(trainee_id)
-    provider = s.get("provider") or "claude"
+    provider = s.get("provider") or "openwebui"
     # LITMUS_HTTP_PROXY is a server-level setting (not per-user) for environments
     # where the AI endpoint is only reachable through a local proxy such as
     # Cloudflare WARP in gateway mode. Unset on production servers that have
@@ -129,9 +129,9 @@ def _load_ai_config(trainee_id: int) -> dict:
     http_proxy = os.environ.get("LITMUS_HTTP_PROXY", "").strip() or None
     return {
         "provider":    provider,
-        "api_base":    s.get("api_base") or os.environ.get("LITMUS_API_BASE", ""),
+        "api_base":    s.get("api_base") or os.environ.get("LITMUS_API_BASE", "https://ai.internal.litmus.io/api"),
         "api_key":     s.get("api_key") or os.environ.get("LITMUS_API_KEY", ""),
-        "grade_model": s.get("grade_model") or os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001"),
+        "grade_model": s.get("grade_model") or os.environ.get("LITMUS_GRADE_MODEL", "gpt-4o"),
         "ssl_verify":  provider in ("claude", "gemini"),
         "http_proxy":  http_proxy,
     }

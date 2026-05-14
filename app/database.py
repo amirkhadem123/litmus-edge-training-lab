@@ -79,10 +79,10 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS trainee_settings (
                 trainee_id  INTEGER PRIMARY KEY REFERENCES trainees(id),
-                provider    TEXT NOT NULL DEFAULT 'claude',
-                api_base    TEXT NOT NULL DEFAULT '',
+                provider    TEXT NOT NULL DEFAULT 'openwebui',
+                api_base    TEXT NOT NULL DEFAULT 'https://ai.internal.litmus.io/api',
                 api_key     TEXT NOT NULL DEFAULT '',
-                grade_model TEXT NOT NULL DEFAULT 'claude-haiku-4-5-20251001'
+                grade_model TEXT NOT NULL DEFAULT 'gpt-4o'
             );
 
             CREATE TABLE IF NOT EXISTS attempts (
@@ -194,10 +194,10 @@ def admin_reset_password(trainee_id: int, new_password_hash: str) -> None:
 
 def init_trainee_settings(trainee_id: int) -> None:
     """Insert default settings row. Pre-populate from server env vars if set."""
-    provider    = os.environ.get("LITMUS_PROVIDER", "claude")
-    api_base    = os.environ.get("LITMUS_API_BASE", "")
+    provider    = os.environ.get("LITMUS_PROVIDER", "openwebui")
+    api_base    = os.environ.get("LITMUS_API_BASE", "https://ai.internal.litmus.io/api")
     api_key     = os.environ.get("LITMUS_API_KEY", "")
-    grade_model = os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001")
+    grade_model = os.environ.get("LITMUS_GRADE_MODEL", "gpt-4o")
     with _connect() as conn:
         conn.execute(
             """INSERT OR IGNORE INTO trainee_settings
@@ -218,10 +218,10 @@ def get_trainee_settings(trainee_id: int) -> dict:
     # No row yet — return env-var defaults without writing to DB
     return {
         "trainee_id":  trainee_id,
-        "provider":    os.environ.get("LITMUS_PROVIDER", "claude"),
-        "api_base":    os.environ.get("LITMUS_API_BASE", ""),
+        "provider":    os.environ.get("LITMUS_PROVIDER", "openwebui"),
+        "api_base":    os.environ.get("LITMUS_API_BASE", "https://ai.internal.litmus.io/api"),
         "api_key":     os.environ.get("LITMUS_API_KEY", ""),
-        "grade_model": os.environ.get("LITMUS_GRADE_MODEL", "claude-haiku-4-5-20251001"),
+        "grade_model": os.environ.get("LITMUS_GRADE_MODEL", "gpt-4o"),
     }
 
 
