@@ -3,46 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Litmus Lab{% endblock %}</title>
+  <title>{% block title %}Litmus Support Lab{% endblock %}</title>
   <style>
     /* ── Reset & base ─────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #f5f0e8;
-      color: #2c2318;
+      background: #f2f8f6;
+      color: #032125;
       min-height: 100vh;
       line-height: 1.6;
     }
 
-    a { color: #7a5230; text-decoration: none; }
-    a:hover { text-decoration: underline; color: #5c3c22; }
+    a { color: #002f2b; text-decoration: none; }
+    a:hover { text-decoration: underline; color: #3adb90; }
 
     /* ── Header ───────────────────────────────────────────────────────── */
     .header {
-      background: #e8dfd0;
-      border-bottom: 1px solid #c8bfaf;
-      padding: 0.75rem 2rem;
+      background: #002f2b;
+      padding: 0 2rem;
       display: flex;
       align-items: center;
       gap: 1.25rem;
+      height: 52px;
     }
     .header-logo {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: #2c2318;
-      letter-spacing: -0.4px;
+      display: flex;
+      align-items: baseline;
+      gap: 0.45rem;
+      text-decoration: none;
     }
-    .header-logo span { color: #9c6b2e; }
-    .header-nav { display: flex; gap: 1rem; margin-left: auto; }
+    .header-logo:hover { text-decoration: none; }
+    .logo-litmus {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #3adb90;
+      text-transform: uppercase;
+    }
+    .logo-name {
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: #f2f8f6;
+      letter-spacing: 0.01em;
+    }
+    .logo-version {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #5e9e8a;
+      letter-spacing: 0.04em;
+      align-self: flex-end;
+      margin-bottom: 1px;
+    }
+    .header-nav { display: flex; gap: 0.25rem; margin-left: auto; }
     .header-nav a {
-      font-size: 0.85rem;
-      color: #7a6e62;
-      padding: 0.3rem 0.7rem;
+      font-size: 0.83rem;
+      color: #9ee8c5;
+      padding: 0.3rem 0.75rem;
       border-radius: 5px;
     }
-    .header-nav a:hover { background: #ddd5c5; color: #2c2318; text-decoration: none; }
+    .header-nav a:hover {
+      background: rgba(58, 219, 144, 0.15);
+      color: #3adb90;
+      text-decoration: none;
+    }
 
     /* ── Layout ───────────────────────────────────────────────────────── */
     .container {
@@ -67,11 +92,11 @@
     }
     .btn:hover { opacity: 0.82; text-decoration: none; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary  { background: #7a5230; color: #fdf8f0; }
-    .btn-success  { background: #4a7a4e; color: #fdf8f0; }
-    .btn-danger   { background: #9c3030; color: #fdf8f0; }
-    .btn-warning  { background: #9c6b2e; color: #fdf8f0; }
-    .btn-ghost    { background: #ede8df; color: #5a4e42; border: 1px solid #c8bfaf; }
+    .btn-primary  { background: #002f2b; color: #f2f8f6; }
+    .btn-success  { background: #3adb90; color: #002f2b; }
+    .btn-danger   { background: #9c3030; color: #f2f8f6; }
+    .btn-warning  { background: #c87820; color: #f2f8f6; }
+    .btn-ghost    { background: #e5f0ec; color: #032125; border: 1px solid #b5d6ce; }
 
     /* ── Badges ───────────────────────────────────────────────────────── */
     .badge {
@@ -84,9 +109,9 @@
       text-transform: uppercase;
     }
     .badge-open     { background: #d4e4f0; color: #2a5478; }
-    .badge-solved   { background: #d4edda; color: #2a5c38; }
+    .badge-solved   { background: #c5f5e0; color: #002f2b; }
     .badge-escalate { background: #f5ddd0; color: #7c3d20; }
-    .badge-beginner     { background: #d4edda; color: #2a5c38; }
+    .badge-beginner     { background: #c5f5e0; color: #002f2b; }
     .badge-intermediate { background: #fdecd0; color: #7c4e10; }
     .badge-advanced     { background: #e8d8f0; color: #5c3478; }
 
@@ -100,15 +125,15 @@
     }
     .alert-warning { background: #fdf0d8; border-color: #c87820; color: #7c4e10; }
     .alert-info    { background: #ddeef8; border-color: #4a82a8; color: #2a4e6c; }
-    .alert-success { background: #ddf0e0; border-color: #3a8044; color: #1e4a28; }
+    .alert-success { background: #d5f5e8; border-color: #3adb90; color: #002f2b; }
     .alert-error   { background: #f8ddd8; border-color: #a83030; color: #6c1e1e; }
 
     /* ── Form elements ────────────────────────────────────────────────── */
     input[type="text"], select, textarea {
-      background: #fdf8f0;
-      border: 1px solid #c8bfaf;
+      background: #f7fbf9;
+      border: 1px solid #b5d6ce;
       border-radius: 6px;
-      color: #2c2318;
+      color: #032125;
       font-family: inherit;
       font-size: 0.9rem;
       padding: 0.5rem 0.75rem;
@@ -118,13 +143,13 @@
     select:focus,
     textarea:focus {
       outline: none;
-      border-color: #9c6b2e;
-      box-shadow: 0 0 0 2px rgba(156, 107, 46, 0.15);
+      border-color: #3adb90;
+      box-shadow: 0 0 0 2px rgba(58, 219, 144, 0.25);
     }
-    select option { background: #fdf8f0; }
+    select option { background: #f7fbf9; }
     label {
       font-size: 0.85rem;
-      color: #7a6e62;
+      color: #4a6e6a;
       display: block;
       margin-bottom: 0.3rem;
     }
@@ -134,8 +159,8 @@
     .spinner {
       display: inline-block;
       width: 14px; height: 14px;
-      border: 2px solid rgba(44, 35, 24, 0.2);
-      border-top-color: #2c2318;
+      border: 2px solid rgba(3, 33, 37, 0.15);
+      border-top-color: #3adb90;
       border-radius: 50%;
       animation: spin 0.6s linear infinite;
       vertical-align: middle;
@@ -146,8 +171,8 @@
     .mt-1 { margin-top: 0.5rem; }
     .mt-2 { margin-top: 1rem; }
     .mt-3 { margin-top: 1.5rem; }
-    .text-muted { color: #8a7e72; font-size: 0.85rem; }
-    hr { border: none; border-top: 1px solid #d8d0c0; margin: 1.5rem 0; }
+    .text-muted { color: #5e8080; font-size: 0.85rem; }
+    hr { border: none; border-top: 1px solid #c5dcd7; margin: 1.5rem 0; }
 
     {% block extra_styles %}{% endblock %}
   </style>
@@ -155,7 +180,11 @@
 <body>
 
   <header class="header">
-    <div class="header-logo"><span>Litmus</span> Lab</div>
+    <a href="/dashboard" class="header-logo">
+      <span class="logo-litmus">Litmus</span>
+      <span class="logo-name">Support Lab</span>
+      <span class="logo-version">v3.0</span>
+    </a>
     <nav class="header-nav">
       <a href="/dashboard">Dashboard</a>
       <a href="/settings">⚙ Settings</a>

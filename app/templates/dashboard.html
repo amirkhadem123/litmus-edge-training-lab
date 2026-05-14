@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Litmus Lab{% endblock %}
+{% block title %}Dashboard — Litmus Support Lab{% endblock %}
 
 {% block extra_styles %}
 /* ── Welcome bar ───────────────────────────────────────────────────── */
@@ -12,11 +12,11 @@
 .welcome-bar h1 {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
 }
 .welcome-bar .change-name {
   font-size: 0.8rem;
-  color: #8a7e72;
+  color: #5e8080;
 }
 
 /* ── Section headings ──────────────────────────────────────────────── */
@@ -25,10 +25,10 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   margin-bottom: 1rem;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid #d8d0c0;
+  border-bottom: 1px solid #c5dcd7;
 }
 
 /* ── Checkpoint cards ──────────────────────────────────────────────── */
@@ -39,32 +39,29 @@
 }
 .cp-card {
   flex: 1;
-  background: #ede8df;
-  border: 1px solid #c8bfaf;
+  background: #e5f0ec;
+  border: 1px solid #b5d6ce;
   border-radius: 10px;
   padding: 1.25rem 1.1rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-.cp-card.locked-card {
-  opacity: 0.55;
-}
 .cp-card.passed-card {
-  border-color: #4a7a4e;
-  background: #edf5ee;
+  border-color: #3adb90;
+  background: #d5f5e8;
 }
 .cp-num {
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #9c6b2e;
+  color: #002f2b;
 }
 .cp-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   line-height: 1.3;
 }
 .cp-meta {
@@ -75,7 +72,7 @@
 }
 .cp-score {
   font-size: 0.85rem;
-  color: #4a7a4e;
+  color: #002f2b;
   font-weight: 600;
   margin-top: 0.2rem;
 }

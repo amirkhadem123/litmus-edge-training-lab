@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Results — Litmus Lab{% endblock %}
+{% block title %}Results — Litmus Support Lab{% endblock %}
 
 {% block extra_styles %}
 .results-layout {
@@ -12,22 +12,22 @@
 
 /* ── Polling state ───────────────────────────────────────────── */
 .grading-banner {
-  background: #fdf5e0;
-  border: 1px solid #c8a040;
+  background: #fdf0d8;
+  border: 1px solid #c87820;
   border-radius: 8px;
   padding: 1.25rem 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #6a4e10;
+  color: #7c4e10;
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
 }
 
 /* ── Grade card ──────────────────────────────────────────────── */
 .grade-card {
-  background: #ede8df;
-  border: 1px solid #c8bfaf;
+  background: #e5f0ec;
+  border: 1px solid #b5d6ce;
   border-radius: 12px;
   padding: 1.5rem 1.5rem;
   margin-bottom: 1.5rem;
@@ -45,23 +45,23 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #9c6b2e;
+  color: #5e8080;
   margin-bottom: 0.25rem;
 }
-.grade-scenario { font-size: 1rem; font-weight: 700; color: #2c2318; }
+.grade-scenario { font-size: 1rem; font-weight: 700; color: #032125; }
 
 .score-block { text-align: right; }
 .score-number {
   font-size: 2.2rem;
   font-weight: 700;
   line-height: 1;
-  color: #2c2318;
+  color: #032125;
 }
-.score-number.passed { color: #2a5c38; }
+.score-number.passed { color: #002f2b; }
 .score-number.failed { color: #7c1e1e; }
 .score-label {
   font-size: 0.8rem;
-  color: #7a6e62;
+  color: #5e8080;
   margin-top: 0.15rem;
 }
 .pass-badge {
@@ -72,7 +72,7 @@
   font-weight: 700;
   margin-top: 0.35rem;
 }
-.pass-badge.passed { background: #d4edda; color: #1e4a28; }
+.pass-badge.passed { background: #c5f5e0; color: #002f2b; }
 .pass-badge.failed { background: #f8ddd8; color: #6c1e1e; }
 
 /* ── Direction row ───────────────────────────────────────────── */
@@ -80,13 +80,13 @@
   display: flex;
   gap: 1.5rem;
   padding: 0.75rem 0;
-  border-top: 1px solid #d8d0c0;
-  border-bottom: 1px solid #d8d0c0;
+  border-top: 1px solid #c5dcd7;
+  border-bottom: 1px solid #c5dcd7;
   margin-bottom: 1.25rem;
   font-size: 0.85rem;
 }
-.direction-row .dir-item { color: #4a3e32; }
-.direction-row .dir-label { color: #7a6e62; font-size: 0.75rem; display: block; }
+.direction-row .dir-item { color: #032125; }
+.direction-row .dir-label { color: #5e8080; font-size: 0.75rem; display: block; }
 
 /* ── Dimension table ─────────────────────────────────────────── */
 .dim-table {
@@ -101,25 +101,25 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid #c8bfaf;
+  border-bottom: 1px solid #b5d6ce;
 }
 .dim-table td {
   padding: 0.55rem 0.6rem;
-  border-bottom: 1px solid #ddd5c5;
+  border-bottom: 1px solid #c5dcd7;
   vertical-align: middle;
 }
 .dim-table tr:last-child td { border-bottom: none; }
-.dim-score { font-weight: 700; color: #2c2318; }
+.dim-score { font-weight: 700; color: #032125; }
 .dim-bar-wrap {
   width: 80px;
   height: 6px;
-  background: #d8d0c0;
+  background: #c5dcd7;
   border-radius: 3px;
   overflow: hidden;
 }
-.dim-bar { height: 100%; border-radius: 3px; background: #7a5230; }
+.dim-bar { height: 100%; border-radius: 3px; background: #3adb90; }
 
 /* ── Feedback sections ───────────────────────────────────────── */
 .feedback-section { margin-bottom: 1.5rem; }
@@ -128,39 +128,39 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   margin-bottom: 0.75rem;
 }
 .dim-feedback-block {
   margin-bottom: 1rem;
   padding: 0.85rem 1rem;
-  background: #fdf8f0;
+  background: #f0faf5;
   border-radius: 8px;
-  border-left: 3px solid #9c6b2e;
+  border-left: 3px solid #3adb90;
 }
 .dim-feedback-name {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #5a3e22;
+  color: #002f2b;
   margin-bottom: 0.3rem;
 }
-.dim-feedback-text { font-size: 0.875rem; color: #2c2318; line-height: 1.6; }
+.dim-feedback-text { font-size: 0.875rem; color: #032125; line-height: 1.6; }
 
 .overall-feedback {
   padding: 1rem 1.1rem;
-  background: #fdf8f0;
+  background: #f0faf5;
   border-radius: 8px;
-  border-left: 3px solid #4a7a4e;
+  border-left: 3px solid #3adb90;
   font-size: 0.9rem;
-  color: #2c2318;
+  color: #032125;
   line-height: 1.65;
   white-space: pre-wrap;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────── */
 .sidebar-card {
-  background: #ede8df;
-  border: 1px solid #c8bfaf;
+  background: #e5f0ec;
+  border: 1px solid #b5d6ce;
   border-radius: 8px;
   padding: 1rem;
   margin-bottom: 1rem;
@@ -170,11 +170,11 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   margin-bottom: 0.7rem;
 }
-.sidebar-card .info-row { font-size: 0.85rem; color: #2c2318; margin-bottom: 0.3rem; }
-.sidebar-card .info-label { color: #7a6e62; }
+.sidebar-card .info-row { font-size: 0.85rem; color: #032125; margin-bottom: 0.3rem; }
+.sidebar-card .info-label { color: #5e8080; }
 
 /* ── Thread (compact) ────────────────────────────────────────── */
 .thread-compact { margin-top: 1.5rem; }
@@ -183,10 +183,10 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   margin-bottom: 0.75rem;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid #d8d0c0;
+  border-bottom: 1px solid #c5dcd7;
 }
 .msg-compact {
   padding: 0.5rem 0.75rem;
@@ -197,8 +197,8 @@
   white-space: pre-wrap;
 }
 .msg-compact.customer { background: #e8f0f5; border-left: 3px solid #4a82a8; }
-.msg-compact.trainee  { background: #edf5ee; border-left: 3px solid #4a7a4e; }
-.msg-sender { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #7a6e62; margin-bottom: 0.2rem; }
+.msg-compact.trainee  { background: #d5f5e8; border-left: 3px solid #3adb90; }
+.msg-sender { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #5e8080; margin-bottom: 0.2rem; }
 {% endblock %}
 
 {% block content %}

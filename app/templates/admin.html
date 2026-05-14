@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Admin — Litmus Lab{% endblock %}
+{% block title %}Admin — Litmus Support Lab{% endblock %}
 
 {% block extra_styles %}
 .admin-wrap h1 {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   margin-bottom: 0.3rem;
 }
 
@@ -38,18 +38,18 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #d8d0c0;
+  border-bottom: 1px solid #c5dcd7;
 }
 .trainee-table td {
   padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid #ede8df;
-  color: #2c2318;
+  border-bottom: 1px solid #e5f0ec;
+  color: #032125;
   vertical-align: top;
 }
 .trainee-table tr:last-child td { border-bottom: none; }
-.trainee-table tr:hover td { background: #f5f0e8; }
+.trainee-table tr:hover td { background: #e5f0ec; }
 
 .cp-status-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .cp-chip {
@@ -59,16 +59,15 @@
   border-radius: 999px;
   white-space: nowrap;
 }
-.cp-chip.passed            { background: #d4edda; color: #1e4a28; }
-.cp-chip.failed_no_reattempt { background: #f5ddd0; color: #7c3d20; }
-.cp-chip.failed_reattempt_available { background: #fdecd0; color: #7c4e10; }
-.cp-chip.available         { background: #d4e4f0; color: #2a5478; }
-.cp-chip.locked            { background: #e0dbd2; color: #7a6e62; }
+.cp-chip.passed    { background: #c5f5e0; color: #002f2b; }
+.cp-chip.failed    { background: #f5ddd0; color: #7c3d20; }
+.cp-chip.available { background: #d4e4f0; color: #2a5478; }
+.cp-chip.locked    { background: #e5f0ec; color: #5e8080; }
 
 .attempt-list { list-style: none; padding: 0; margin: 0; }
 .attempt-list li {
   font-size: 0.78rem;
-  color: #4a3e32;
+  color: #032125;
   padding: 0.2rem 0;
   display: flex;
   gap: 0.4rem;

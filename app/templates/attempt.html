@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ scenario.ticket.subject }} — Litmus Lab{% endblock %}
+{% block title %}{{ scenario.ticket.subject }} — Litmus Support Lab{% endblock %}
 
 {% block extra_styles %}
 /* ── Two-column layout ─────────────────────────────────────────── */
@@ -20,7 +20,7 @@
 .attempt-header h1 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   margin-bottom: 0.3rem;
 }
 .attempt-meta {
@@ -29,7 +29,7 @@
   align-items: center;
   flex-wrap: wrap;
   font-size: 0.8rem;
-  color: #7a6e62;
+  color: #5e8080;
 }
 
 /* ── Conversation thread ───────────────────────────────────────── */
@@ -51,15 +51,15 @@
 }
 .msg-trainee {
   align-self: flex-end;
-  background: #edf5ee;
-  border-right: 3px solid #4a7a4e;
-  color: #1a2e18;
+  background: #d5f5e8;
+  border-right: 3px solid #3adb90;
+  color: #032125;
   text-align: left;
 }
 .msg-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #7a6e62;
+  color: #5e8080;
   margin-bottom: 0.25rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -68,7 +68,7 @@
 /* ── Reply form ────────────────────────────────────────────────── */
 .reply-section {
   margin-top: 1.5rem;
-  border-top: 1px solid #d8d0c0;
+  border-top: 1px solid #c5dcd7;
   padding-top: 1.25rem;
 }
 .reply-section textarea {
@@ -81,12 +81,12 @@
 .submit-section {
   margin-top: 1.25rem;
   padding-top: 1.25rem;
-  border-top: 1px solid #d8d0c0;
+  border-top: 1px solid #c5dcd7;
 }
 .submit-section h3 {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   margin-bottom: 0.5rem;
 }
 .submit-buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; }
@@ -95,8 +95,8 @@
 .submit-form {
   display: none;
   margin-top: 1rem;
-  background: #ede8df;
-  border: 1px solid #c8bfaf;
+  background: #e5f0ec;
+  border: 1px solid #b5d6ce;
   border-radius: 8px;
   padding: 1rem 1.1rem;
 }
@@ -105,7 +105,7 @@
 .submit-form .form-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #2c2318;
+  color: #032125;
   display: block;
   margin-bottom: 0.4rem;
 }
@@ -113,21 +113,21 @@
 /* ── Grading banner ────────────────────────────────────────────── */
 .grading-banner {
   margin-top: 1.5rem;
-  background: #fdf5e0;
-  border: 1px solid #c8a040;
+  background: #fdf0d8;
+  border: 1px solid #c87820;
   border-radius: 8px;
   padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #6a4e10;
+  color: #7c4e10;
   font-size: 0.9rem;
 }
 
 /* ── Sidebar cards ─────────────────────────────────────────────── */
 .sidebar-card {
-  background: #ede8df;
-  border: 1px solid #c8bfaf;
+  background: #e5f0ec;
+  border: 1px solid #b5d6ce;
   border-radius: 8px;
   padding: 1rem;
   margin-bottom: 1rem;
@@ -137,25 +137,25 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #8a7e72;
+  color: #5e8080;
   margin-bottom: 0.7rem;
 }
 .sidebar-card .info-row {
   font-size: 0.85rem;
-  color: #2c2318;
+  color: #032125;
   margin-bottom: 0.3rem;
 }
-.sidebar-card .info-label { color: #7a6e62; }
+.sidebar-card .info-label { color: #5e8080; }
 .checklist { list-style: none; padding: 0; margin: 0; }
 .checklist li {
   font-size: 0.82rem;
-  color: #4a3e32;
+  color: #032125;
   padding: 0.25rem 0;
-  border-bottom: 1px solid #d8d0c0;
+  border-bottom: 1px solid #c5dcd7;
   line-height: 1.4;
 }
 .checklist li:last-child { border-bottom: none; }
-.checklist li::before { content: "□ "; color: #9c6b2e; }
+.checklist li::before { content: "□ "; color: #002f2b; }
 {% endblock %}
 
 {% block content %}

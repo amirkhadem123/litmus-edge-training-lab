@@ -72,7 +72,7 @@ from app.scenarios import (
 load_dotenv()
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Litmus Lab")
+app = FastAPI(title="Litmus Support Lab")
 
 
 _jinja_env = jinja2.Environment(

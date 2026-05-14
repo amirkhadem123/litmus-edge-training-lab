@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sign In — Litmus Lab{% endblock %}
+{% block title %}Sign In — Litmus Support Lab{% endblock %}
 
 {% block extra_styles %}
 .auth-wrap {
@@ -7,28 +7,28 @@
   margin: 4rem auto;
 }
 .auth-card {
-  background: #ede8df;
-  border: 1px solid #c8bfaf;
+  background: #e5f0ec;
+  border: 1px solid #b5d6ce;
   border-radius: 12px;
   padding: 2rem 2rem 1.75rem;
 }
 .auth-card h1 {
   font-size: 1.35rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   margin-bottom: 0.25rem;
 }
 .auth-card .subtitle {
   font-size: 0.85rem;
-  color: #8a7e72;
+  color: #5e8080;
   margin-bottom: 1.5rem;
 }
 input[type="email"],
 input[type="password"] {
-  background: #fdf8f0;
-  border: 1px solid #c8bfaf;
+  background: #f7fbf9;
+  border: 1px solid #b5d6ce;
   border-radius: 6px;
-  color: #2c2318;
+  color: #032125;
   font-family: inherit;
   font-size: 0.9rem;
   padding: 0.5rem 0.75rem;
@@ -37,13 +37,13 @@ input[type="password"] {
 input[type="email"]:focus,
 input[type="password"]:focus {
   outline: none;
-  border-color: #9c6b2e;
-  box-shadow: 0 0 0 2px rgba(156, 107, 46, 0.15);
+  border-color: #3adb90;
+  box-shadow: 0 0 0 2px rgba(58, 219, 144, 0.25);
 }
 .auth-footer {
   text-align: center;
   font-size: 0.85rem;
-  color: #8a7e72;
+  color: #5e8080;
   margin-top: 1.25rem;
 }
 {% endblock %}
@@ -52,7 +52,7 @@ input[type="password"]:focus {
 <div class="auth-wrap">
   <div class="auth-card">
     <h1>Sign In</h1>
-    <p class="subtitle">Litmus Lab — Support Practice Certificate</p>
+    <p class="subtitle">Litmus Support Lab — Support Practice Certificate</p>
 
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}AI Settings — Litmus Lab{% endblock %}
+{% block title %}AI Settings — Litmus Support Lab{% endblock %}
 
 {% block extra_styles %}
 .settings-wrap {
@@ -8,7 +8,7 @@
 .settings-wrap h1 {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   margin-bottom: 0.3rem;
 }
 
@@ -21,21 +21,21 @@
 .provider-card {
   flex: 1;
   position: relative;
-  border: 2px solid #c8bfaf;
+  border: 2px solid #b5d6ce;
   border-radius: 10px;
   padding: 0.85rem 1rem;
   cursor: pointer;
-  background: #fdf8f0;
+  background: #f7fbf9;
   transition: border-color 0.15s, background 0.15s;
   user-select: none;
 }
 .provider-card:hover {
-  border-color: #9c6b2e;
-  background: #faf3e8;
+  border-color: #3adb90;
+  background: #e5f0ec;
 }
 .provider-card.selected {
-  border-color: #7a5230;
-  background: #f5ede0;
+  border-color: #002f2b;
+  background: #d5f5e8;
 }
 .provider-card input[type="radio"] {
   position: absolute;
@@ -46,7 +46,7 @@
 .provider-card .card-dot {
   width: 14px;
   height: 14px;
-  border: 2px solid #9c8878;
+  border: 2px solid #5e8080;
   border-radius: 50%;
   display: inline-block;
   margin-right: 0.4rem;
@@ -56,20 +56,20 @@
   transition: border-color 0.15s, background 0.15s;
 }
 .provider-card.selected .card-dot {
-  border-color: #7a5230;
-  background: #7a5230;
-  box-shadow: inset 0 0 0 2px #f5ede0;
+  border-color: #002f2b;
+  background: #002f2b;
+  box-shadow: inset 0 0 0 2px #d5f5e8;
 }
 .card-name {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #2c2318;
+  color: #032125;
   display: flex;
   align-items: center;
 }
 .card-desc {
   font-size: 0.75rem;
-  color: #8a7e72;
+  color: #5e8080;
   margin-top: 0.25rem;
 }
 
@@ -82,10 +82,10 @@
   flex: 1;
 }
 input[type="password"] {
-  background: #fdf8f0;
-  border: 1px solid #c8bfaf;
+  background: #f7fbf9;
+  border: 1px solid #b5d6ce;
   border-radius: 6px;
-  color: #2c2318;
+  color: #032125;
   font-family: inherit;
   font-size: 0.9rem;
   padding: 0.5rem 0.75rem;
@@ -93,18 +93,18 @@ input[type="password"] {
 }
 input[type="password"]:focus {
   outline: none;
-  border-color: #9c6b2e;
-  box-shadow: 0 0 0 2px rgba(156, 107, 46, 0.15);
+  border-color: #3adb90;
+  box-shadow: 0 0 0 2px rgba(58, 219, 144, 0.25);
 }
 input[readonly] {
-  background: #ede8df;
-  color: #6a5e52;
+  background: #e5f0ec;
+  color: #5e8080;
   cursor: default;
 }
 
 .key-saved {
   font-size: 0.75rem;
-  color: #3a8044;
+  color: #002f2b;
   font-weight: 600;
   margin-left: 0.4rem;
 }
@@ -123,7 +123,7 @@ input[readonly] {
   margin-top: 0.75rem;
   border-left: 4px solid;
 }
-#test-result.ok    { background: #ddf0e0; border-color: #3a8044; color: #1e4a28; }
+#test-result.ok    { background: #d5f5e8; border-color: #3adb90; color: #002f2b; }
 #test-result.error { background: #f8ddd8; border-color: #a83030; color: #6c1e1e; }
 {% endblock %}
 
