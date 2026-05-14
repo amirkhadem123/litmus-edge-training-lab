@@ -503,8 +503,8 @@ def _run_grading(attempt_id: int, config: dict) -> None:
             if grade.passed:
                 trainee = get_trainee(attempt["trainee_id"])
                 if trainee:
-                    from app.workramp import report_pass
-                    report_pass(trainee["email"], trainee["name"], attempt["checkpoint"])
+                    from app.email_notify import send_pass_email
+                    send_pass_email(trainee["email"], trainee["name"], attempt["checkpoint"])
 
     except Exception as exc:
         log.error("Grading failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
@@ -551,7 +551,6 @@ async def results(request: Request, attempt_id: int) -> HTMLResponse:
         messages=messages,
         grade=grade,
         trainee=trainee,
-        workramp_return_url=os.environ.get("WORKRAMP_RETURN_URL", ""),
     )
 
 
