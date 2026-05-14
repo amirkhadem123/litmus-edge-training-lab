@@ -55,10 +55,15 @@ def init_db() -> None:
                 DROP TABLE IF EXISTS trainees;
             """)
 
-        # Unlock any checkpoints that were locked under the old sequential-unlock scheme
+        # Unlock any checkpoints locked under the old sequential-unlock scheme
         conn.execute(
             "UPDATE checkpoint_progress SET status = 'available', unlocked_at = CURRENT_TIMESTAMP "
             "WHERE status = 'locked'"
+        )
+        # Collapse old attempt-limit statuses into the simple 'failed' state
+        conn.execute(
+            "UPDATE checkpoint_progress SET status = 'failed' "
+            "WHERE status IN ('failed_reattempt_available', 'failed_no_reattempt')"
         )
 
         conn.executescript("""
@@ -438,13 +443,7 @@ def update_checkpoint_after_grade(
 
         attempts_used = row["attempts_used"] + 1
         best_score = max(score, row["best_score"] or 0)
-
-        if passed:
-            new_status = "passed"
-        elif attempts_used >= 2:
-            new_status = "failed_no_reattempt"
-        else:
-            new_status = "failed_reattempt_available"
+        new_status = "passed" if passed else "failed"
 
         conn.execute(
             """UPDATE checkpoint_progress

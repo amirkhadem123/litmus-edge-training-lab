@@ -115,24 +115,18 @@
   {% for s in cert_scenarios %}
   {% set prog = s._progress %}
   {% set status = prog.status %}
-  {% set is_locked = status in ('locked',) %}
   {% set is_passed = status == 'passed' %}
-  {% set is_failed_retry = status == 'failed_reattempt_available' %}
-  {% set is_failed_done = status == 'failed_no_reattempt' %}
+  {% set is_failed = status == 'failed' %}
 
-  <div class="cp-card {% if is_locked %}locked-card{% elif is_passed %}passed-card{% endif %}">
+  <div class="cp-card {% if is_passed %}passed-card{% endif %}">
     <div class="cp-num">Checkpoint {{ s.checkpoint }}</div>
     <div class="cp-title">{{ s.title }}</div>
     <div class="cp-meta">
       <span class="badge badge-{{ s.difficulty }}">{{ s.difficulty }}</span>
       {% if is_passed %}
         <span class="badge badge-solved">Passed</span>
-      {% elif is_failed_done %}
-        <span class="badge badge-escalate">Failed</span>
-      {% elif is_failed_retry %}
-        <span class="badge badge-open">Re-attempt available</span>
-      {% elif is_locked %}
-        <span class="badge" style="background:#e0dbd2;color:#7a6e62">Locked</span>
+      {% elif is_failed %}
+        <span class="badge badge-escalate">Not Passed</span>
       {% else %}
         <span class="badge badge-open">Available</span>
       {% endif %}
@@ -145,14 +139,10 @@
     {% endif %}
 
     <div class="cp-action">
-      {% if is_locked or is_failed_done %}
-        <button class="btn btn-ghost" disabled>
-          {% if is_locked %}🔒 Locked{% else %}No re-attempt{% endif %}
-        </button>
-      {% elif is_passed %}
-        <a href="/attempt/{{ s.id }}/new" class="btn btn-ghost">View / Practice Again</a>
-      {% elif is_failed_retry %}
-        <a href="/attempt/{{ s.id }}/new" class="btn btn-warning">Try Again (1 attempt left)</a>
+      {% if is_passed %}
+        <a href="/attempt/{{ s.id }}/new" class="btn btn-ghost">View / Retake</a>
+      {% elif is_failed %}
+        <a href="/attempt/{{ s.id }}/new" class="btn btn-warning">Try Again</a>
       {% else %}
         <a href="/attempt/{{ s.id }}/new" class="btn btn-primary">Begin →</a>
       {% endif %}

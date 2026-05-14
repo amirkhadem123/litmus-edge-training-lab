@@ -314,8 +314,7 @@ async def new_attempt(request: Request, scenario_id: str) -> Response:
 
         cp_progress = get_checkpoint_progress(trainee_id)
         progress = cp_progress.get(checkpoint, {})
-        status = progress.get("status", "available")
-        attempt_number = 2 if status == "failed_reattempt_available" else 1
+        attempt_number = progress.get("attempts_used", 0) + 1
     else:
         attempt_number = 1
 
