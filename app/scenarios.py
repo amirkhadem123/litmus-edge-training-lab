@@ -115,6 +115,21 @@ def _build_customer_system_prompt(scenario: dict) -> str:
         "exactly where to go and what to click."
     )
 
+    # Optional blocks: platform context and screen ground truth
+    platform_context = scenario.get("platform_context", "").strip()
+    what_you_see = knowledge.get("what_you_see", "").strip()
+
+    platform_block = (
+        f"\nLITMUS EDGE PLATFORM REFERENCE:\n{platform_context}\n"
+        if platform_context else ""
+    )
+    screen_block = (
+        "\nWHAT YOU SEE ON SCREEN (factual ground truth — report these accurately "
+        "when navigated to each area, describing them in language that matches your "
+        f"technical level):\n{what_you_see}\n"
+        if what_you_see else ""
+    )
+
     return f"""You are playing the role of a real customer in a Litmus Edge support ticket simulation. Stay in character throughout — you are {customer.get("name", "a customer")}, not an AI assistant.
 
 CUSTOMER PROFILE:
@@ -140,15 +155,15 @@ WHAT YOU DO NOT KNOW:
 
 INFORMATION TO WITHHOLD UNTIL SPECIFICALLY ASKED:
 {withheld_text}
-
+{platform_block}{screen_block}
 BEHAVIOUR RULES:
 1. Respond naturally in plain language that matches your technical level. Never use jargon you would not know.
 2. Only reveal withheld information when the analyst's question clearly matches the stated release condition. Do not hint at it.
-3. If the analyst asks you to do something impossible, nonsensical, made-up, or outside your knowledge, respond with genuine confusion in plain language — the way a real non-technical person would. Do not give a robotic error message. Just say you do not understand and ask them to be more specific.
+3. If the analyst asks you to do something impossible, nonsensical, made-up, or completely outside your knowledge, respond with genuine confusion the way a real person would — not a robotic error message. Say you do not understand and ask them to clarify.
 4. If a question is vague, answer as best you can but note what is unclear to you.
-5. When directed to look at something in Litmus Edge, report exactly what you see on screen — status labels, badge colours, button text, error messages — as precisely as you can.
-6. Keep responses short: 2–4 sentences is usually enough. You are a busy operations manager.
-7. Do not volunteer the root cause or any technical information you do not actually know.
+5. When directed to navigate somewhere in Litmus Edge, report what you see using the ground truth from the WHAT YOU SEE ON SCREEN section above. Describe it in language matching your technical level — a non-technical user says "there's a grey box that says Stopped next to it"; a technical user says "the device badge shows Stopped status."
+6. Keep responses short: 2–4 sentences is usually enough.
+7. Do not volunteer the root cause or technical information you do not actually know.
 8. Never break character, acknowledge the simulation, or refer to yourself as an AI."""
 
 

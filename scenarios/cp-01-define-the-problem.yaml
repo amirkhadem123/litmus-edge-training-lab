@@ -40,6 +40,27 @@ diagnostic_checklist:
   - Confirm the device status badge and report back before taking action
   - Verify dashboard values resume updating after the fix
 
+platform_context: |
+  Litmus Edge is a web-based industrial IoT platform accessed through a browser. Key areas:
+
+  DeviceHub — the main screen for managing connected field devices (PLCs, sensors, OPC UA
+  servers, etc.). Accessed via the left sidebar navigation. Shows a list of configured
+  devices, each with a status badge: green "Connected" means the device is actively polling
+  and publishing data; grey "Stopped" means the device has been manually paused and is not
+  collecting data; red "Disconnected" means the driver cannot reach the device. Each device
+  row has action controls including Start (resumes polling) and Stop (pauses polling).
+  Clicking a device opens its detail view, which includes its tag list, configuration
+  settings, and a device log showing recent driver activity.
+
+  Tags — each device has one or more tags representing individual data points (e.g., a
+  temperature reading, a flow rate). Tags have configuration including a polling or sampling
+  interval specified in milliseconds. A tag showing "Good" quality means the last received
+  value was valid; this does not mean the value is current.
+
+  Historian / Dashboard — time-series data from tags is stored and can be visualised.
+  If a device is Stopped or Disconnected, its tags stop receiving new values and appear
+  frozen on the dashboard.
+
 customer_persona: |
   Sarah is an Operations Manager at a mid-size plastics manufacturing plant. She is
   not a technical user — she relies on her IT team and the Litmus support team for
@@ -75,6 +96,17 @@ customer_knowledge:
         analyst asks about recent activity in the system, whether anyone else accessed
         Litmus Edge this morning, whether any changes were made, or what happened around
         the time the issue started
+  what_you_see: |
+    DeviceHub (when directed there):
+      The device list shows several devices. "PlantFloor-TempSensor1" is visible in
+      the list. Next to its name there is a grey badge or label — it says "Stopped".
+      There are two small buttons beside it — one appears to be a play/start button
+      and one a stop button. No error message or alert is visible on the device row.
+
+    Dashboard (when checking values):
+      Before fix: all temperature readings are frozen — the numbers are not changing.
+      After clicking Start and waiting a moment: the values begin updating every few
+      seconds, fluctuating as expected for live sensor data.
 
 # ── Internal documentation (not shown to trainee — used by grading agent only) ─
 
@@ -171,4 +203,4 @@ grading_rubric:
   critical_penalties:
     - condition: wrong_direction
       cap: cap_at_50
-      applies_to_checkpoints: []
+      applies_to_checkpoints: [1]

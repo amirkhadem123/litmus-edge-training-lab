@@ -9,193 +9,164 @@ customer:
   name: James Okonkwo
   company: Maritime Logistics Corp
   le_version: "4.0.6"
+  role: Controls Lead
+  litmus_certified: true
+  ui_access: true
+  technical_level: high
 
 ticket:
-  subject: "Litmus Edge DeviceHub keeps restarting — all devices lose connection every few hours"
+  subject: "DeviceHub restarts every few hours, disconnecting all devices"
   initial_message: |
     Hi,
 
-    We are experiencing a critical issue with our Litmus Edge instance. The DeviceHub service
-    appears to restart itself roughly every 4–6 hours, and every time it does, all of our
-    devices lose connection simultaneously. We get data gaps in the historian that correspond
-    exactly to the restart times.
+    We are experiencing a critical issue with our Litmus Edge instance. The DeviceHub
+    service appears to restart itself roughly every 4–6 hours, and every time it does,
+    all of our devices lose connection simultaneously. We get data gaps in the historian
+    that correspond exactly to the restart timestamps.
 
-    This has been happening for about three days. We have 14 devices connected, including
-    a large OPC UA device with over 3,000 tags. We're on Litmus Edge 4.0.6.
+    This has been happening for approximately three days. We have 14 devices connected,
+    including a large OPC UA device ("Vessel-Track-OPC1") with approximately 3,200 tags.
+    We're running Litmus Edge 4.0.6. I've checked the admin panel and can see
+    "DeviceHub service: process terminated — OOM restart" entries at each event.
 
-    Our team is not able to identify the root cause from the Litmus Edge admin interface alone.
-    We need this escalated if necessary — this is affecting production tracking.
+    I can't identify the root cause from the web interface alone. Escalation may be
+    required — this is affecting production tracking.
 
     James Okonkwo
     Controls Lead
     Maritime Logistics Corp
 
-diagnostic_checklist:
-  - "Ask James to confirm the restart timing and whether it follows any consistent pattern"
-  - "Ask James to check the LE admin system logs for the restart events and note any error messages"
-  - "Ask about the device types and specifically about the large OPC UA device with 3000+ tags"
-  - "Ask James to check if restarts correlate with polling activity on the high-tag-count OPC UA device"
-  - "Ask James to attempt to access the LE node process logs via CLI/SSH — note if this is possible"
-  - "Document all findings clearly and escalate to L2 Engineering with a complete summary"
+platform_context: |
+  Litmus Edge is a web-based industrial IoT platform accessed through a browser.
 
-root_cause: |
-  The DeviceHub service on this Litmus Edge 4.0.6 instance is experiencing a memory leak in
-  the OPC UA driver when managing a large number of monitored items. With 3,000+ tags on a
-  single OPC UA device, the driver's internal subscription management structures grow
-  unboundedly over time. After 4–6 hours of operation, the process exhausts available memory
-  and the operating system triggers an OOM (Out of Memory) kill, which restarts the DeviceHub
-  service.
+  DeviceHub — manages connected field devices. Shows a device list with status badges:
+  green "Connected", grey "Stopped", red "Disconnected". Each device has a tag list
+  and a configuration view. Clicking a device shows its detail including a device log
+  with timestamped driver-level entries.
 
-  This is a known bug in Litmus Edge 4.0.x for the OPC UA driver under high tag counts. A fix
-  is in development by the Litmus Engineering team but has not yet been released in a 4.0.x patch.
+  Admin panel — accessible to admin users. Contains system-level logs showing service
+  lifecycle events including restarts, errors, and status changes.
 
-  The L1 support trainee CANNOT fix this at the customer site. They cannot:
-  - Reduce the tag count without customer approval and significant re-configuration work
-  - Apply a patch that doesn't exist yet
-  - Access the LE process logs needed for definitive diagnosis (requires CLI/SSH to the LE node)
+  OOM (Out of Memory) — when a process exhausts available system memory, the operating
+  system terminates it. In Litmus Edge this appears in admin logs as an OOM restart
+  entry for the affected service (in this case DeviceHub).
 
-  The correct action is to ESCALATE to L2 Engineering with a complete evidence package:
-  restart intervals, LE version, device type and tag count, OOM log evidence, correlation to
-  OPC UA polling activity.
+  SSH / CLI access — the Litmus Edge node runs on Linux. Process-level logs (beyond
+  what the web interface exposes) require SSH or CLI access directly to the node. This
+  is not always available to customers due to security policies.
 
-correct_response_summary: |
-  1. Confirm restart timing: every 4–6 hours, no manual trigger
-  2. Retrieve system logs from LE admin panel: see "DeviceHub service: OOM restart" entries
-  3. Identify the high-tag-count OPC UA device (3000+ tags) as the likely memory pressure source
-  4. Correlate: restarts occur when OPC UA subscription management is under sustained load
-  5. Note that deeper process logs require SSH/CLI access the customer cannot provide in this channel
-  6. Conclude: this is a platform-level memory leak in 4.0.6, requires engineering intervention
-  7. Escalate with full evidence package: version, device type, tag count, intervals, log excerpts
+  OPC UA high tag counts — the Litmus Edge OPC UA driver manages subscriptions for
+  each monitored tag. Very large tag counts (thousands of monitored items) place
+  significant load on the driver's internal memory management structures.
 
-# ── Scripted customer simulation ─────────────────────────────────────────────
-scripted_replies:
-  - triggers:
-      - "restart timing"
-      - "how often"
-      - "when does it restart"
-      - "consistent pattern"
-      - "every few hours"
-      - "how frequently"
-    reply: |
-      Yes, it's very consistent — roughly every 4 to 6 hours from when the service last
-      started. It happened at 2 AM, 7 AM, and 1 PM yesterday. Then again at 6 AM today.
-      There's no manual trigger we can identify — it just drops without warning.
+customer_persona: |
+  James is a Controls Lead at a maritime logistics company. He is technically experienced,
+  has completed the Litmus User Certificate, and is comfortable navigating the Litmus Edge
+  admin interface independently. He understands OPC UA, knows what OOM means when he sees
+  it in a log, and can describe what he observes with precision. He has already done initial
+  investigation before submitting the ticket and he is genuinely stumped. He is under
+  pressure — this is a production system — but communicates professionally and methodically.
+  He will not exaggerate. He will not understate. If he does not know something, he says so.
+  He cannot provide SSH or CLI access to the LE node due to his company's IT security policy.
 
-  - triggers:
-      - "system log"
-      - "admin log"
-      - "check the log"
-      - "LE log"
-      - "admin panel"
-      - "restart events"
-      - "log entries"
-    reply: |
-      I've found the logs in the Litmus Edge admin panel. I can see entries like:
-      "DeviceHub service: process terminated — OOM restart"
-      These appear at the same timestamps as each disconnection event. There are no
-      other prominent errors before each restart — just that OOM message.
+customer_knowledge:
+  observes: |
+    The DeviceHub service restarts roughly every 4 to 6 hours with no manual trigger.
+    Each restart causes all 14 connected devices to drop simultaneously and reconnect
+    within a few minutes, creating data gaps in the historian. This has been happening
+    for approximately three days. He has checked the Litmus Edge admin panel and can see
+    "DeviceHub service: process terminated — OOM restart" entries at each event timestamp.
+    One of the connected devices — "Vessel-Track-OPC1" — is an OPC UA device with
+    approximately 3,200 tags, added when they expanded their vessel tracking system
+    six months ago. The instance was upgraded from 4.0.4 to 4.0.6 about one month ago.
+  can_do: |
+    Navigate the Litmus Edge web interface and admin panel independently. Check logs
+    available through the web interface. Look at device configuration and tag counts.
+    Report specific log text, timestamps, and error messages accurately.
+  does_not_know: |
+    Why DeviceHub is restarting. That this is a known memory leak bug in the 4.0.x OPC UA
+    driver under high tag counts. That the restarts are OOM kills triggered by the driver's
+    unbounded memory growth with 3,200 monitored items. Any fix at the application level
+    that does not require engineering intervention or a firmware patch.
+  withheld:
+    - info: >
+        Maritime Logistics Corp has a regulatory compliance audit in 48 hours. The historian
+        data feeds directly into a maritime authority reporting system, and any gaps in the
+        record will require a formal explanation to the auditors. This makes the situation
+        significantly more urgent than James initially indicated.
+      release_when: >
+        analyst asks about business impact, urgency, deadlines, regulatory requirements,
+        what's at stake if the issue is not resolved quickly, or whether there is a
+        specific timeline they are working against
+  what_you_see: |
+    System / admin logs (when asked to check):
+      In the Litmus Edge admin panel under system logs, James can see entries at each
+      restart timestamp reading: "DeviceHub service: process terminated — OOM restart".
+      The timestamps match the disconnection events: approximately 2 AM, 7 AM, and
+      1 PM yesterday, then again at 6 AM today. No prominent errors appear in the log
+      immediately before each OOM entry — just the termination message itself.
 
-  - triggers:
-      - "opc ua"
-      - "device type"
-      - "which device"
-      - "tag count"
-      - "how many tags"
-      - "3000"
-      - "large device"
-    reply: |
-      Our main OPC UA device — "Vessel-Track-OPC1" — has about 3,200 tags. We added a
-      large block of monitoring points six months ago when we expanded our vessel tracking
-      system. That device has been running fine until three days ago.
+    DeviceHub — device list (when asked):
+      All 14 devices are visible. Most show "Connected" (green). During a restart
+      window all show "Disconnected" briefly before recovering. Vessel-Track-OPC1
+      is visible in the list. Its configuration shows approximately 3,200 tags.
 
-  - triggers:
-      - "correlation"
-      - "polling activity"
-      - "does it restart when"
-      - "during polling"
-      - "opc ua polling"
-      - "high load"
-    reply: |
-      That's interesting — looking at the timestamps more carefully, the restarts do seem
-      to happen after several hours of continuous operation, not immediately at startup.
-      I'm not sure how to correlate it to specific polling activity though.
+    SSH / CLI access (when asked):
+      James cannot provide this. His company's IT security policy restricts command-line
+      access to production systems. He can only access what is available through the
+      Litmus Edge web interface.
 
-  - triggers:
-      - "ssh"
-      - "cli"
-      - "command line"
-      - "terminal"
-      - "process log"
-      - "node log"
-      - "deeper log"
-      - "access the server"
-    reply: |
-      We don't have SSH access configured on this Litmus Edge node — our IT security policy
-      restricts command-line access to production systems. I can only access what's available
-      through the Litmus Edge web interface.
+    Version information (when asked):
+      The admin panel or about page shows Litmus Edge version 4.0.6. James recalls
+      the upgrade from 4.0.4 happened approximately one month ago.
 
-  - triggers:
-      - "version"
-      - "which version"
-      - "le version"
-      - "4.0.6"
-    reply: |
-      Yes, we're on Litmus Edge 4.0.6. We upgraded to this version about a month ago from 4.0.4.
-      The OOM restarts started about three days ago — so maybe two to three weeks after the upgrade.
-
-  - triggers:
-      - "workaround"
-      - "temporary fix"
-      - "reduce tag"
-      - "remove tags"
-      - "scheduled restart"
-    reply: |
-      We could potentially schedule a restart every few hours as a workaround, but that would
-      still cause data gaps. Reducing tags isn't something we can do without approval from
-      our maritime operations team — it would affect regulatory tracking data.
-
-  - triggers:
-      - "patch"
-      - "update"
-      - "newer version"
-      - "upgrade"
-    reply: |
-      Is there a newer version that fixes this? We'd need to go through a change control
-      process for any upgrade — that typically takes 2–3 weeks for our team.
-
-  - triggers:
-      - "historian"
-      - "data gap"
-      - "how much data"
-      - "lost data"
-    reply: |
-      Each restart causes roughly a 3–5 minute gap in the historian — that's how long it
-      takes DeviceHub to restart and all devices to reconnect. Over three days, we've
-      accumulated quite a few gaps in our tracking records.
-
-  - triggers:
-      - "other device"
-      - "14 devices"
-      - "all devices"
-      - "other connections"
-    reply: |
-      All 14 devices drop together during each restart — that confirms it's the DeviceHub
-      service itself that's restarting, not individual devices. They all reconnect
-      within a few minutes once DeviceHub comes back up.
-
-# Urgency injection — fires after customer's 3rd reply
+# ── Urgency injection — fires after customer's 3rd reply ─────────────────────
 urgency_injection:
   enabled: true
   trigger_after_customer_message: 3
   text: |
-    I should also mention — we just learned that our vessel tracking data feeds into a maritime
-    authority compliance reporting system. We have a regulatory audit in 48 hours and the
-    auditors will be reviewing our historian data. Any gaps in the record will require a formal
-    explanation. This has become urgent from a compliance standpoint.
+    I should also mention — we just learned that our vessel tracking data feeds into a
+    maritime authority compliance reporting system. We have a regulatory audit in 48 hours
+    and the auditors will be reviewing our historian data. Any gaps in the record will
+    require a formal explanation. This has become urgent from a compliance standpoint.
 
-fallback_reply: |
-  That's a good question. Let me check what I can access. What specifically should I be
-  looking for?
+# ── Internal documentation (not shown to trainee — used by grading agent only) ─
+
+root_cause: |
+  The DeviceHub service on this Litmus Edge 4.0.6 instance is experiencing a memory leak
+  in the OPC UA driver when managing a large number of monitored items. With 3,200+ tags on
+  a single OPC UA device, the driver's internal subscription management structures grow
+  unboundedly over time. After 4–6 hours of operation, the process exhausts available memory
+  and the OS triggers an OOM kill, which restarts the DeviceHub service.
+
+  This is a known bug in Litmus Edge 4.0.x for the OPC UA driver under high tag counts.
+  A fix is in development but has not been released in a patch.
+
+  The correct action is ESCALATION. The trainee cannot fix this at L0:
+  - Cannot reduce tag count without customer approval and significant reconfiguration
+  - Cannot apply a patch that does not yet exist
+  - Cannot access the process-level logs needed for definitive confirmation (requires
+    SSH/CLI which is blocked by the customer's IT security policy)
+
+escalation_reason: |
+  This is a platform-level bug in Litmus Edge 4.0.x — a memory leak in the OPC UA driver
+  under high monitored item counts. No L0 fix exists. The customer cannot provide CLI
+  access for deeper investigation. Escalation to L2 Engineering is required with a
+  complete evidence package: version, OOM log evidence, device type and tag count,
+  restart intervals, and the compliance deadline for priority setting.
+
+correct_response_summary: |
+  1. Confirm restart timing: every 4–6 hours, no manual trigger identified
+  2. Retrieve system logs from LE admin panel: note "DeviceHub service: OOM restart" entries
+  3. Identify Vessel-Track-OPC1 as having 3,200+ tags — flag as potential memory pressure source
+  4. Correlate: restarts occur after sustained operation, not at startup
+  5. Note that deeper process logs require SSH/CLI access the customer cannot provide
+  6. After urgency injection: acknowledge the compliance deadline, adjust escalation priority
+  7. Conclude: platform-level memory leak in 4.0.6 OPC UA driver, engineering intervention required
+  8. Escalate with complete evidence package: version, device type and tag count, restart
+     intervals, OOM log evidence, inaccessible CLI logs, compliance deadline
+
+# ── Grading rubric ────────────────────────────────────────────────────────────
 
 grading_rubric:
   pass_threshold: 70
@@ -203,50 +174,70 @@ grading_rubric:
     - name: Proactive first response
       max_points: 15
       description: |
-        Did the trainee respond with an organized, professional initial reply that acknowledged
-        the severity, asked targeted diagnostic questions (timing, logs, device types), and set
-        appropriate expectations? Award full points for a structured response with ≥2 specific
-        diagnostic questions. Award 8 pts for a polite response but with vague or generic questions.
-        Award 0 pts for immediately asking the customer to restart things or assuming a simple fix.
+        Did the trainee respond with an organised, professional initial reply that
+        acknowledged the severity, asked targeted diagnostic questions, and set
+        appropriate expectations?
+
+        Award 15 pts for a structured response with at least two specific closed
+        diagnostic questions covering restart timing, log content, and/or device types.
+        Award 8 pts for a professional response but with vague or generic questions.
+        Award 0 pts for immediately suggesting a fix or restart without any
+        diagnostic questions.
 
     - name: Urgency handling
       max_points: 20
       description: |
-        Did the trainee appropriately acknowledge the compliance deadline when James mentioned
-        the 48-hour audit window? Award full points for explicitly noting the urgency, adjusting
-        the priority of the escalation, and communicating a clear timeline commitment to the customer.
-        Award 10 pts for acknowledging the urgency but not adjusting the escalation approach.
-        Award 0 pts for ignoring the urgency or treating it as a routine ticket after the disclosure.
+        Did the trainee appropriately acknowledge and act on the compliance deadline
+        when James disclosed the 48-hour audit window?
+
+        Award 20 pts for explicitly acknowledging the urgency, adjusting the
+        escalation priority, and communicating a clear, specific commitment to James
+        about next steps and timeline.
+        Award 10 pts for acknowledging the urgency verbally but not adjusting the
+        escalation approach or priority.
+        Award 0 pts for ignoring the urgency disclosure or treating the ticket as
+        routine after it was raised.
 
     - name: Investigation quality
       max_points: 20
       description: |
-        Did the trainee systematically gather enough evidence to characterize the problem?
-        Award full points for collecting: restart intervals, OOM log evidence, LE version,
-        OPC UA device with 3000+ tags, and noting that CLI/process logs are inaccessible.
-        Award 12 pts for gathering 3–4 of these evidence points. Award 5 pts for gathering
-        only 1–2. Award 0 pts for skipping investigation and jumping to escalation/resolution
-        without evidence.
+        Did the trainee systematically gather enough evidence to characterise the
+        problem before escalating?
+
+        Award 20 pts for collecting all of: restart intervals and frequency, OOM log
+        evidence with specific log text, LE version, the high-tag-count OPC UA device
+        (Vessel-Track-OPC1 with 3,200+ tags), and noting that CLI/process logs are
+        inaccessible due to the customer's IT security policy.
+        Award 12 pts for gathering 3–4 of these evidence points.
+        Award 5 pts for gathering 1–2 evidence points only.
+        Award 0 pts for escalating immediately without gathering any evidence.
 
     - name: Escalation decision
       max_points: 25
       description: |
-        Did the trainee correctly decide to escalate rather than attempting an L0/L1 fix?
-        Award full points for explicitly stating this is a platform-level issue (memory leak
-        in 4.0.6 OPC UA driver) that requires engineering, and that no L1 fix exists without
-        CLI access or a patch. Award 15 pts for escalating but without clear reasoning.
-        Award 0 pts for attempting to resolve at L1 (e.g., telling customer to reduce tags,
-        restart on a schedule) without escalation.
+        Did the trainee correctly decide to escalate rather than attempt an L0 fix?
+
+        Award 25 pts for explicitly stating this is a platform-level issue (OOM restarts
+        consistent with a memory leak in the OPC UA driver under high tag counts) that
+        requires engineering, and that no L1 fix exists without CLI access or a patch.
+        Award 15 pts for escalating but without a clear stated reason why L0 cannot
+        resolve it.
+        Award 0 pts for attempting an L1 resolution (e.g. telling James to reduce tags,
+        schedule restarts, or upgrade) without escalation.
 
     - name: Escalation note quality
       max_points: 20
       description: |
-        Did the escalation note include all necessary information for L2 Engineering?
-        Award full points for an escalation note that covers: LE version, device type and
-        tag count, restart interval and frequency, OOM log evidence, inaccessible CLI logs,
-        urgency (compliance deadline), and a clear statement of what was ruled out.
-        Award 12 pts for a note that covers most but not all elements. Award 5 pts for a
-        brief note that lacks key details L2 would need.
+        Did the escalation note include all information L2 Engineering would need to
+        act on this immediately?
+
+        Award 20 pts for an escalation note covering: LE version (4.0.6), device type
+        and tag count (OPC UA, 3,200+ tags), restart interval and frequency, OOM log
+        evidence with specific text, note that CLI logs are inaccessible, compliance
+        deadline with 48-hour window, and a clear statement of what was already ruled out.
+        Award 12 pts for a note that covers most but is missing 1–2 critical elements.
+        Award 5 pts for a brief summary that lacks key details L2 would need to begin
+        their investigation.
 
   critical_penalties:
     - condition: wrong_direction

@@ -9,174 +9,140 @@ customer:
   name: Carlos Medina
   company: Apex Process Systems
   le_version: "4.0.6"
+  role: Controls Engineer
+  litmus_certified: true
+  ui_access: true
+  technical_level: high
 
 ticket:
-  subject: "OPC UA process tags connected and showing Good — but values not changing for hours"
+  subject: "OPC UA tags show Good quality but values appear completely frozen"
   initial_message: |
     Hello,
 
     We have an OPC UA device ("Process-Monitor-OPC1") in Litmus Edge that's been behaving
     strangely since yesterday afternoon. The device shows "Connected" in DeviceHub and all
-    tags are showing "Good" quality — so it looks healthy. But the values haven't changed
-    in several hours, which is impossible for our process parameters (temperature and flow
-    rates should be fluctuating constantly).
+    18 tags are showing "Good" quality — so it looks healthy on the surface. But the values
+    haven't changed in several hours, which is impossible for our process parameters
+    (temperature and flow rates should be fluctuating constantly).
 
-    I've checked the OPC UA server side and data is definitely changing there. Something
-    is wrong on the Litmus Edge side — but since the status shows Connected and Good, I'm
-    at a loss.
+    I've already verified on the OPC UA server side that data is definitely changing there.
+    Something is wrong on the Litmus Edge side, but since the device status shows Connected
+    and all tags show Good, I can't identify the cause.
 
-    Any help appreciated.
+    Any help would be appreciated.
 
     Carlos Medina
     Controls Engineer
     Apex Process Systems
 
-diagnostic_checklist:
-  - "Confirm the device shows Connected and tags show Good quality (eliminate network/connection issue)"
-  - "Ask Carlos when the freezing started and what was changed before it happened"
-  - "Ask Carlos to check the device log in DeviceHub for any warnings or error patterns"
-  - "Look carefully at the device log — identify the SubscriptionTransferFailed lines but note they are not the root cause"
-  - "Ask Carlos to check the tag settings, specifically the polling/update interval"
-  - "Guide Carlos to change the polling interval from 1800000ms to 1000ms and verify data updates"
+platform_context: |
+  Litmus Edge is a web-based industrial IoT platform accessed through a browser. Key areas:
+
+  DeviceHub — manages connected field devices. Shows a device list with status badges:
+  green "Connected" (actively polling), grey "Stopped" (manually paused), red
+  "Disconnected" (driver cannot reach the device). Clicking a device opens its detail
+  view with the tag list, configuration settings, and a device log.
+
+  Tags — each device has tags representing individual data points. Tag configuration
+  includes a polling or sampling interval in milliseconds. Tag quality is reported
+  as "Good" (last value was valid), "Bad", or "Uncertain". Good quality does NOT mean
+  the value is current — a tag can show Good quality while its value is hours old if
+  the polling interval is extremely long.
+
+  Device log — visible from the device detail view. Shows timestamped entries from the
+  driver process including subscription events, connection changes, and errors.
+
+  OPC UA specifics — OPC UA devices use a subscription model where the Litmus Edge
+  driver registers monitored items with the OPC UA server. "SubscriptionTransferFailed"
+  entries appear when a monitoring client (such as an external dashboard) disconnects
+  and reconnects, trying to re-register its subscriptions. This is normal OPC UA
+  protocol behaviour and does not affect tag polling by the Litmus Edge driver itself.
+
+customer_persona: |
+  Carlos is a Controls Engineer with solid experience in industrial automation and OPC UA.
+  He has completed the Litmus User Certificate, so he knows his way around the Litmus Edge
+  interface — DeviceHub, tag settings, device logs — without needing to be walked through it.
+  He is technically confident, communicates precisely, and has already done some initial
+  investigation before submitting the ticket. He is methodical and will follow diagnostic
+  instructions carefully. He is frustrated but professional. He knows enough to know something
+  is wrong but genuinely cannot identify the cause from what he can see.
+
+customer_knowledge:
+  observes: |
+    The OPC UA device "Process-Monitor-OPC1" shows "Connected" in DeviceHub with a green badge.
+    All 18 tags show "Good" quality. However, the values have not changed in several hours —
+    temperature and flow rates should be fluctuating constantly. He has already verified on the
+    OPC UA server side that data is changing there. The freezing started yesterday around 3 PM.
+    He has Litmus Edge open and can navigate anywhere in the interface without guidance.
+  can_do: |
+    Navigate to any screen in DeviceHub independently. Check device logs, tag settings,
+    configuration fields. Change configuration values and save them. Verify results after
+    changes are applied.
+  does_not_know: |
+    Why the values are frozen when quality shows Good. That the polling interval was changed
+    to 1,800,000ms (30 minutes) by the technician. That the SubscriptionTransferFailed log
+    entries are benign and unrelated to the frozen values.
+  withheld:
+    - info: >
+        A technician was doing configuration work on the device yesterday afternoon — testing
+        different polling setups for a potential low-frequency monitoring project. He said he
+        reverted everything before leaving, but Carlos is not completely sure he did.
+      release_when: >
+        analyst asks what changed before the issue started, whether any configuration work
+        was done, who accessed the device settings, or when the issue began relative to
+        any activity on the system
+  what_you_see: |
+    DeviceHub — device status:
+      Process-Monitor-OPC1 shows a green "Connected" badge. All 18 tags are visible
+      in the tag list and show "Good" quality. The last-received values look numerically
+      plausible but are completely static — the same numbers have not changed.
+
+    Device log (when asked to check):
+      Repeated entries reading: "SubscriptionTransferFailed: subscription could not be
+      transferred to new session, id=4821" (IDs vary). These appear in two clusters:
+      roughly 20–30 entries around 2 PM yesterday, and another cluster around 8 AM
+      this morning. No connection errors, timeouts, or driver crash messages are visible.
+
+    Tag settings / polling interval (when asked to check):
+      There is a field for polling interval (may be labeled "Update Interval" or
+      "Sampling Rate"). The current value is 1800000. The unit is milliseconds.
+      This applies to all 18 tags on the device.
+
+    After fix (interval changed to 1000ms and saved):
+      Tag values begin updating every second. Temperature and flow rate readings are
+      visibly fluctuating in real time. The historian shows fresh data points arriving.
+
+# ── Internal documentation (not shown to trainee — used by grading agent only) ─
 
 root_cause: |
-  The tag polling interval on Process-Monitor-OPC1 was accidentally set to 1,800,000ms (30 minutes)
-  during configuration work last week. A technician was testing a low-frequency sampling scenario and
-  inadvertently saved the change to the production device without reverting it.
+  The tag polling interval on Process-Monitor-OPC1 was accidentally set to 1,800,000ms
+  (30 minutes) during configuration work by a technician the previous afternoon. He was
+  testing a low-frequency sampling scenario and inadvertently saved the change to the
+  production device without reverting it.
 
-  At a 30-minute interval, tags appear completely static to operators used to 1-second updates.
-  The OPC UA driver is technically working correctly — it IS polling the server — just extremely
-  slowly. The tags show "Good" quality because the last received values are valid; the driver
-  isn't in an error state.
+  At a 30-minute interval, tags appear completely static to operators used to 1-second
+  updates. The OPC UA driver is technically working correctly — it IS polling the server —
+  just extremely slowly. Tags show "Good" quality because the last received values are
+  valid; the driver is not in an error state.
 
-  The red herring in the device log is repeated "SubscriptionTransferFailed" warnings. These are
-  generated by an OPC UA monitoring client (a separate dashboard integration) that reconnected
-  after a brief network dropout and tried to re-register its subscriptions. This is a benign
-  OPC UA protocol behavior — it does not affect tag polling and was coincidentally logged around
-  the same time the slow-polling issue was noticed.
+  The red herring: repeated "SubscriptionTransferFailed" warnings in the device log.
+  These were generated by a separate dashboard integration client that reconnected after
+  a brief network dropout and tried to re-register its subscriptions. This is normal OPC UA
+  behaviour — it does not affect tag polling and is completely unrelated to the frozen values.
 
-  Fix: in the device tag settings, change the polling/update interval from 1800000ms to 1000ms.
-  Tags will then update at 1-second intervals and values will appear live again.
+  Fix: in the device tag settings, change the polling/update interval from 1800000ms to
+  1000ms. Tags will then update at 1-second intervals and values will appear live again.
 
 correct_response_summary: |
-  1. Confirm the device is Connected and tags show Good (this rules out connection/subscription failures)
-  2. Ask when the freezing started and what changed — the technician's configuration work
-  3. Check device logs → see SubscriptionTransferFailed warnings, but recognize these are benign
-  4. Dig deeper: ask Carlos to look at the tag polling/update interval setting
+  1. Confirm device is Connected and tags show Good — this rules out connection errors
+  2. Ask when the freezing started and what changed — surfaces the technician's work
+  3. Check device log → SubscriptionTransferFailed warnings appear, but recognise
+     these are from a reconnecting dashboard client, not related to the polling issue
+  4. Ask Carlos to look at the tag polling/update interval setting
   5. Find the interval set to 1800000ms (30 minutes) — this is the actual problem
-  6. Change the interval to 1000ms, save, and verify that tag values begin updating rapidly
+  6. Change to 1000ms, save, and verify that tag values begin updating rapidly
 
-# ── Scripted customer simulation ─────────────────────────────────────────────
-scripted_replies:
-  - triggers:
-      - "connected"
-      - "status"
-      - "confirm connected"
-      - "device status"
-      - "device showing"
-      - "quality"
-      - "tag quality"
-    reply: |
-      Yes — device shows "Connected" with a green badge, and all 18 tags show "Good" quality.
-      The last values look plausible, just completely static. Nothing is flagging as an error.
-
-  - triggers:
-      - "when did it start"
-      - "what changed"
-      - "any changes"
-      - "yesterday"
-      - "before it happened"
-      - "configuration"
-      - "who changed"
-    reply: |
-      It started yesterday around 3 PM. We had a technician doing some configuration work on
-      that device — testing different polling setups for a potential low-frequency monitoring
-      project. He said he reverted his changes before leaving, but maybe something was saved.
-
-  - triggers:
-      - "log"
-      - "device log"
-      - "check the log"
-      - "any warnings"
-      - "error"
-    reply: |
-      I've opened the device log. I can see a lot of lines like:
-      "SubscriptionTransferFailed: subscription could not be transferred to new session, id=4821"
-      These appear in clusters — maybe 20–30 entries around 2 PM yesterday, then again this
-      morning around 8 AM. Other than that, no connection errors.
-
-  - triggers:
-      - "subscription"
-      - "SubscriptionTransferFailed"
-      - "what does that mean"
-      - "is that the problem"
-      - "transfer failed"
-    reply: |
-      Are those subscription transfer errors the cause? I wasn't sure if they were significant —
-      they seemed to come from one of our dashboard clients reconnecting.
-
-  - triggers:
-      - "tag setting"
-      - "polling interval"
-      - "update interval"
-      - "sampling rate"
-      - "update rate"
-      - "interval"
-      - "tag configuration"
-    reply: |
-      I'm looking at the tag settings now. I see a polling interval field — it's set to 1800000.
-      That seems large. Is that in milliseconds? That would be... 30 minutes?
-
-  - triggers:
-      - "1000"
-      - "change the interval"
-      - "change it to"
-      - "set the interval"
-      - "update the interval"
-    reply: |
-      I've changed the polling interval to 1000ms on all tags and saved. Wow — the values
-      are updating every second now. I can see the temperature and flow rate fluctuating
-      in real time. That was definitely the issue.
-
-  - triggers:
-      - "opc server"
-      - "server side"
-      - "check the server"
-      - "opc ua server"
-    reply: |
-      Yes, I've already verified on the OPC UA server side — the data there is changing
-      constantly, as expected. The problem is definitely on the Litmus Edge side.
-
-  - triggers:
-      - "restart"
-      - "reboot"
-      - "restart the device"
-    reply: |
-      I tried restarting the device in DeviceHub but it didn't change anything — the values
-      are still frozen at the same numbers.
-
-  - triggers:
-      - "verify"
-      - "is it working"
-      - "check now"
-      - "updating now"
-      - "fixed"
-    reply: |
-      Yes, all values are updating correctly now — every second, as expected. The tags look
-      completely live and the historian is receiving fresh data points. Thank you!
-
-  - triggers:
-      - "all tags"
-      - "which tags"
-      - "same for all"
-      - "how many"
-    reply: |
-      All 18 tags on that device appear frozen. They all had the same last-update timestamp —
-      which matches when I think the technician finished his changes yesterday.
-
-fallback_reply: |
-  I see what you're asking. Let me check that — could you point me to where in DeviceHub I
-  should be looking?
+# ── Grading rubric ────────────────────────────────────────────────────────────
 
 grading_rubric:
   pass_threshold: 70
@@ -184,42 +150,59 @@ grading_rubric:
     - name: Elimination sequence
       max_points: 30
       description: |
-        Did the trainee work through at least 3 distinct elimination steps before arriving at
-        the root cause? Award full points for a systematic sequence: (1) confirm device Connected
-        and tags Good, (2) ask about recent changes, (3) check logs, (4) investigate tag settings.
-        Award 20 pts for 2–3 steps with minor gaps. Award 0 pts for jumping directly to the fix
-        without diagnostic steps.
+        Did the trainee work through at least 3 distinct elimination steps before
+        arriving at the root cause?
+
+        Award 30 pts for a systematic sequence covering: (1) confirming device Connected
+        and tags Good to rule out connection issues, (2) asking about recent changes to
+        surface the technician's configuration work, (3) checking the device log, and
+        (4) investigating the tag polling interval setting.
+        Award 20 pts for 2–3 steps with minor gaps but clear direction.
+        Award 0 pts for jumping directly to "check the polling interval" without any
+        diagnostic steps — even if the guess is correct, the method was not followed.
 
     - name: Red herring handling
       max_points: 25
       description: |
-        Did the trainee correctly identify the SubscriptionTransferFailed log entries as benign
-        and not the root cause? Award full points for explicitly noting the log warnings are from
-        a reconnecting client (not a tag-polling issue) and moving on to deeper investigation.
-        Award 10 pts for acknowledging the logs but staying stuck on them. Deduct 15 pts if the
-        trainee concluded the subscription errors ARE the root cause and tried to fix those.
+        Did the trainee correctly identify the SubscriptionTransferFailed log entries
+        as benign and not the root cause?
+
+        Award 25 pts for explicitly recognising the log warnings as a reconnecting
+        dashboard client behaviour (not a tag polling issue) and moving on to deeper
+        investigation.
+        Award 10 pts for acknowledging the logs without getting stuck on them but also
+        without explaining why they are not the cause.
+        Deduct 15 pts (apply 0 pts to this dimension) if the trainee concluded the
+        subscription errors ARE the root cause and attempted to address them.
 
     - name: Evidence quality
       max_points: 25
       description: |
-        Did the trainee gather concrete evidence for the actual root cause before prescribing
-        a fix? Award full points for asking Carlos to check the polling interval setting and
-        finding the 1800000ms value as direct evidence. Award 15 pts for hypothesizing a
-        configuration issue but not asking Carlos to verify the specific setting. Award 5 pts
-        for reaching the right fix by luck without gathering evidence.
+        Did the trainee obtain concrete evidence for the actual root cause before
+        prescribing a fix?
+
+        Award 25 pts for asking Carlos to check the tag polling interval setting and
+        finding the 1800000ms value as direct, specific evidence before recommending
+        the change.
+        Award 15 pts for hypothesising a configuration issue and directing Carlos to
+        check settings, but without asking for the specific value before prescribing
+        the fix.
+        Award 5 pts for reaching the correct fix by hypothesis without evidence.
 
     - name: Resolution accuracy
       max_points: 20
       description: |
-        Were the resolution steps correct? Full points for: identify polling interval at
-        1800000ms → change to 1000ms → save → verify live updates. Deduct 10 pts if the
-        trainee recommended restarting the device or LE service as the fix. Deduct 5 pts
-        for skipping verification.
+        Were the resolution steps correct and complete?
+
+        Award 20 pts for: identify polling interval at 1800000ms → instruct Carlos to
+        change to 1000ms → save → ask Carlos to verify values are updating live.
+        Deduct 10 pts for recommending a device or service restart as the fix.
+        Deduct 5 pts for skipping the verification step after the change.
 
   critical_penalties:
     - condition: wrong_direction
       cap: cap_at_50
-      applies_to_checkpoints: []
+      applies_to_checkpoints: [2]
     - condition: sequence_skipped
       cap: cap_at_40
       applies_to_checkpoints: [2]
