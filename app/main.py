@@ -159,6 +159,32 @@ def _has_ai_key(trainee_id: int) -> bool:
     return bool(config["api_key"] and config["api_base"])
 
 
+def _warp_error_msg(exc: Exception) -> str | None:
+    """
+    Return a human-readable message if the exception looks like a Cloudflare
+    WARP connectivity failure, otherwise return None.
+
+    Two known failure modes:
+      1. Fully disconnected  — error contains "authenticate via the warp client"
+      2. Session redirect    — WARP is running but the session expired; Cloudflare
+                               returns a 302 HTML page instead of the API response,
+                               which the OpenAI SDK surfaces as an APIStatusError
+                               whose body contains "<html>" and "302"/"cloudflare".
+    """
+    text = str(exc).lower()
+    is_warp = (
+        "authenticate via the warp client" in text
+        or ("<html>" in text and ("302" in text or "cloudflare" in text))
+    )
+    if not is_warp:
+        return None
+    return (
+        "Cloudflare WARP connectivity issue — the AI endpoint returned a redirect "
+        "page instead of an API response. Turn WARP off and back on, then try again. "
+        "If WARP is running in gateway mode, set LITMUS_HTTP_PROXY in your .env."
+    )
+
+
 # ── Startup ───────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -384,17 +410,13 @@ async def reply(attempt_id: int, request: Request, body: str = Form(...)) -> Res
         )
     except Exception as exc:
         log.error("Customer reply failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
-        if "authenticate via the warp client" in str(exc).lower():
-            customer_reply = (
-                "[System: Cloudflare WARP is not connected. "
-                "Reconnect the WARP client and try again. "
-                "If WARP is running in gateway mode, set LITMUS_HTTP_PROXY in your .env.]"
-            )
-        else:
-            customer_reply = (
-                f"[System: Customer reply failed ({type(exc).__name__}: {exc}). "
-                "Check your AI settings at /settings.]"
-            )
+        warp_msg = _warp_error_msg(exc)
+        customer_reply = (
+            f"[System: {warp_msg}]"
+            if warp_msg else
+            f"[System: Customer reply failed ({type(exc).__name__}: {exc}). "
+            "Check your AI settings at /settings.]"
+        )
         did_inject = False
 
     add_message(attempt_id, "customer", customer_reply)
@@ -491,6 +513,8 @@ def _run_grading(attempt_id: int, config: dict) -> None:
 
     except Exception as exc:
         log.error("Grading failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
+        warp_msg = _warp_error_msg(exc)
+        failure_detail = warp_msg or str(exc)
         try:
             create_grade(
                 attempt_id=attempt_id,
@@ -500,7 +524,7 @@ def _run_grading(attempt_id: int, config: dict) -> None:
                 trainee_action=(attempt or {}).get("trainee_action", "resolve"),
                 correct_direction=False,
                 dimension_scores=[],
-                overall_feedback=str(exc),
+                overall_feedback=failure_detail,
                 raw_response=None,
             )
         except Exception:
@@ -658,6 +682,6 @@ async def test_connection(request: Request) -> JSONResponse:
             return JSONResponse({"ok": False, "message": "Connected but model returned empty content. Try a different model or check your Open WebUI model configuration."})
         return JSONResponse({"ok": True, "message": f"Connected. Model replied: {reply_text!r}"})
     except Exception as exc:
-        if "authenticate via the warp client" in str(exc).lower():
-            return JSONResponse({"ok": False, "message": "Cloudflare WARP is not connected. Reconnect the WARP client and try again. If WARP is running in gateway mode, set LITMUS_HTTP_PROXY in your .env."})
-        return JSONResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}"})
+        warp_msg = _warp_error_msg(exc)
+        msg = warp_msg or f"{type(exc).__name__}: {exc}"
+        return JSONResponse({"ok": False, "message": msg})
