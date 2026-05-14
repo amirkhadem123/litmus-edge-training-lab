@@ -66,8 +66,10 @@ desktop.ini        # Windows folder customisation
 test_tags.py
 
 # ── Runtime state ────────────────────────────────────────────────────────────
-# Local SQLite database — machine-specific runtime data, not committed.
+# Local SQLite database and WAL journal files — machine-specific runtime data.
 litmus_lab.db
+litmus_lab.db-shm
+litmus_lab.db-wal
 
 # Docker data volume (if mounted locally during development)
 data/
