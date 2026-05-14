@@ -28,6 +28,18 @@
       gap: 1.25rem;
       height: 52px;
     }
+    .header-logo-img {
+      height: 28px;
+      width: auto;
+      display: block;
+      flex-shrink: 0;
+    }
+    .header-divider {
+      width: 1px;
+      height: 22px;
+      background: rgba(242, 248, 246, 0.2);
+      flex-shrink: 0;
+    }
     .header-logo {
       display: flex;
       align-items: baseline;
@@ -180,6 +192,8 @@
 <body>
 
   <header class="header">
+    <img src="/static/logo.png" alt="Litmus Academy" class="header-logo-img" />
+    <div class="header-divider"></div>
     <a href="/dashboard" class="header-logo">
       <span class="logo-litmus">Litmus</span>
       <span class="logo-name">Support Lab</span>
