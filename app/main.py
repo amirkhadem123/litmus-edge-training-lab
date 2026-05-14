@@ -503,8 +503,8 @@ def _run_grading(attempt_id: int, config: dict) -> None:
             if grade.passed:
                 trainee = get_trainee(attempt["trainee_id"])
                 if trainee:
-                    from app.email_notify import send_pass_email
-                    send_pass_email(trainee["email"], trainee["name"], attempt["checkpoint"])
+                    from app.slack_notify import send_pass_notification
+                    send_pass_notification(trainee["email"], trainee["name"], attempt["checkpoint"])
 
     except Exception as exc:
         log.error("Grading failed for attempt %d: %s: %s", attempt_id, type(exc).__name__, exc)
