@@ -55,17 +55,6 @@ def init_db() -> None:
                 DROP TABLE IF EXISTS trainees;
             """)
 
-        # Unlock any checkpoints locked under the old sequential-unlock scheme
-        conn.execute(
-            "UPDATE checkpoint_progress SET status = 'available', unlocked_at = CURRENT_TIMESTAMP "
-            "WHERE status = 'locked'"
-        )
-        # Collapse old attempt-limit statuses into the simple 'failed' state
-        conn.execute(
-            "UPDATE checkpoint_progress SET status = 'failed' "
-            "WHERE status IN ('failed_reattempt_available', 'failed_no_reattempt')"
-        )
-
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS trainees (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,6 +123,16 @@ def init_db() -> None:
                 UNIQUE(trainee_id, checkpoint)
             );
         """)
+
+        # Migrations: run after tables exist so they're safe on a fresh DB too
+        conn.execute(
+            "UPDATE checkpoint_progress SET status = 'available', unlocked_at = CURRENT_TIMESTAMP "
+            "WHERE status = 'locked'"
+        )
+        conn.execute(
+            "UPDATE checkpoint_progress SET status = 'failed' "
+            "WHERE status IN ('failed_reattempt_available', 'failed_no_reattempt')"
+        )
 
 
 # ── Trainee auth operations ────────────────────────────────────────────────────
