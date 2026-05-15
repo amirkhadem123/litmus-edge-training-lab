@@ -7,8 +7,9 @@ feedback. No trainer required. No live Litmus Edge instance needed.
 
 > **v2 (this branch)** replaces the trainer-led ticket workflow with a fully
 > autonomous, self-paced certificate program structured around three graded
-> checkpoints. Designed to run on a shared internal server accessible over VPN —
-> multiple users can log in simultaneously with their own accounts and AI settings.
+> checkpoints. Supports two deployment modes: a **shared server** (one instance,
+> multiple accounts) and a **local per-trainee** model where each trainee runs
+> their own Docker container on their own laptop.
 
 ---
 
@@ -20,13 +21,14 @@ feedback. No trainer required. No live Litmus Edge instance needed.
 4. [Prerequisites](#prerequisites)
 5. [Local Setup (Dev)](#local-setup-dev)
 6. [Production Deployment (Docker)](#production-deployment-docker)
-7. [Scenario Reference](#scenario-reference)
-8. [How Grading Works](#how-grading-works)
-9. [Adding New Scenarios](#adding-new-scenarios)
-10. [AI Provider Configuration](#ai-provider-configuration)
-11. [Admin View](#admin-view)
-12. [Architecture](#architecture)
-13. [Environment Variables](#environment-variables)
+7. [Trainee Local Deployment (Docker Hub)](#trainee-local-deployment-docker-hub)
+8. [Scenario Reference](#scenario-reference)
+9. [How Grading Works](#how-grading-works)
+10. [Adding New Scenarios](#adding-new-scenarios)
+11. [AI Provider Configuration](#ai-provider-configuration)
+12. [Admin View](#admin-view)
+13. [Architecture](#architecture)
+14. [Environment Variables](#environment-variables)
 
 ---
 
@@ -131,12 +133,14 @@ litmus-lab/
 │       ├── admin.html          ← Admin: all trainees + progress (password-protected)
 │       └── admin_attempt.html  ← Admin: individual attempt detail
 │
-├── Dockerfile           ← Production container build
-├── docker-compose.yml   ← App + nginx orchestration
-├── nginx.conf           ← Reverse proxy config
-├── .env.example         ← Environment variable template
-├── requirements.txt     ← Python dependencies
-└── README.md            ← This file
+├── Dockerfile                ← Production container build
+├── docker-compose.yml        ← App + nginx orchestration (server deployment)
+├── docker-compose.local.yml  ← Single container on port 8765 (trainee local deployment)
+├── nginx.conf                ← Reverse proxy config
+├── .dockerignore             ← Prevents .env and dev files from entering the image
+├── .env.example              ← Environment variable template
+├── requirements.txt          ← Python dependencies
+└── README.md                 ← This file
 ```
 
 ---
@@ -263,6 +267,58 @@ Admins can reset any trainee's password from the admin view:
 Reset field and submit.
 
 There is no email-based self-service password reset — the admin handles it directly.
+
+---
+
+## Trainee Local Deployment (Docker Hub)
+
+Each trainee runs their own isolated instance on their own laptop. No shared server
+needed. Trainees must have **Docker Desktop** installed and **Cloudflare WARP**
+running (required to reach the internal AI endpoint).
+
+### What trainees receive
+
+A single file: `docker-compose.local.yml`. No source code, no `.env` file.
+
+### Trainee setup (one time)
+
+```powershell
+# 1. Save docker-compose.local.yml anywhere (e.g. Desktop)
+# 2. Open PowerShell in that folder and run:
+docker compose -f docker-compose.local.yml up -d
+
+# 3. Open http://localhost:8765 in a browser
+# 4. Register an account
+# 5. Go to Settings → paste in the API key provided by the instructor → Save
+```
+
+All trainee data (progress, grades, conversation history) is stored in a local
+Docker volume and persists across restarts.
+
+### Pulling updates
+
+When a new version is released, trainees run:
+
+```powershell
+docker compose -f docker-compose.local.yml pull
+docker compose -f docker-compose.local.yml up -d
+```
+
+### Publishing a new release (instructor)
+
+```powershell
+docker build -t amirkhadem/litmus-support-lab:latest .
+docker push amirkhadem/litmus-support-lab:latest
+```
+
+The image is hosted at `hub.docker.com/r/amirkhadem/litmus-support-lab`.
+
+### Completion reporting
+
+When a trainee passes a certificate checkpoint, a **Notify Instructor** button
+appears on the results page. Clicking it opens their email client with a
+pre-filled message to `academy@litmus.io` — name, email, checkpoint, and score
+all filled in automatically.
 
 ---
 
