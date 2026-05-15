@@ -25,6 +25,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 import jinja2
@@ -544,6 +545,23 @@ async def results(request: Request, attempt_id: int) -> HTMLResponse:
     grade = get_grade(attempt_id)
     trainee = get_trainee(trainee_id)
 
+    notify_url = None
+    if (grade and grade.get("passed")
+            and attempt.get("checkpoint")
+            and attempt.get("mode") == "certificate"):
+        subject = f"Checkpoint {attempt['checkpoint']} Passed — {trainee['name']}"
+        body = (
+            f"Hi,\n\n"
+            f"I have completed Checkpoint {attempt['checkpoint']} of the Litmus Support Lab.\n\n"
+            f"Name: {trainee['name']}\n"
+            f"Email: {trainee['email']}\n"
+            f"Checkpoint: {attempt['checkpoint']}\n"
+            f"Score: {grade['total_score']}/100\n"
+            f"Submitted: {attempt.get('submitted_at', 'N/A')}\n\n"
+            f"Litmus Support Lab"
+        )
+        notify_url = f"mailto:academy@litmus.io?subject={quote(subject)}&body={quote(body)}"
+
     return _render(
         "results.html",
         attempt=attempt,
@@ -551,6 +569,7 @@ async def results(request: Request, attempt_id: int) -> HTMLResponse:
         messages=messages,
         grade=grade,
         trainee=trainee,
+        notify_url=notify_url,
     )
 
 

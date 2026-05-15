@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8765:8000"
+    volumes:
+      - litmus_data:/data
+
+volumes:
+  litmus_data:

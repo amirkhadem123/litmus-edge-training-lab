@@ -306,6 +306,9 @@
       {% if not grade.passed and attempt.checkpoint %}
         <a href="/attempt/{{ scenario.id }}/new" class="btn btn-warning">Try Again</a>
       {% endif %}
+      {% if notify_url %}
+        <a href="{{ notify_url }}" class="btn btn-primary">Notify Instructor</a>
+      {% endif %}
     </div>
 
     <!-- Conversation thread (collapsed reference) -->
