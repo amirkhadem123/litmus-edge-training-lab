@@ -1,0 +1,9 @@
+.env
+.git
+.gitignore
+.vscode
+__pycache__
+*.pyc
+*.pyo
+docker-compose*.yml
+nginx.conf
