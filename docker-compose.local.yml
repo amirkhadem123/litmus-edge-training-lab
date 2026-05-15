@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: amirkhadem/litmus-support-lab:latest
     restart: unless-stopped
     env_file: .env
     ports:
